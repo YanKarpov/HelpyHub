@@ -1,8 +1,7 @@
 from aiogram import types
-from aiogram.filters import Command
 from aiogram.types import CallbackQuery
 
-from keyboard import get_main_keyboard, get_submenu_keyboard
+from src.keyboard import get_main_keyboard, get_submenu_keyboard
 
 responses = {
     "doc_certificates": "Информация будет",
