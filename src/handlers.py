@@ -18,6 +18,8 @@ category_texts = {
     "Другое": "Разные полезные сведения.",
 }
 
+user_last_message = {}
+
 async def start_handler(message: types.Message):
     await message.answer(
         f"Привет, {message.from_user.full_name}!\nЯ знаю, что у тебя вопрос и я постараюсь его решить ❤️",
@@ -25,17 +27,29 @@ async def start_handler(message: types.Message):
     )
 
 async def callback_handler(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
     data = callback.data
 
     if data in categories:
+        if user_id in user_last_message:
+            try:
+                await callback.message.bot.delete_message(
+                    chat_id=callback.message.chat.id,
+                    message_id=user_last_message[user_id]
+                )
+            except Exception:
+                pass  
+
         photo_path = category_pictures.get(data)
         text = category_texts.get(data, "")
+
         if photo_path:
             photo = FSInputFile(photo_path)
-            await callback.message.answer_photo(photo, caption=text)
+            sent = await callback.message.answer_photo(photo, caption=text)
         else:
-            # Если фото нет, просто отправляем текст
-            await callback.message.answer(text)
+            sent = await callback.message.answer(text)
+
+        user_last_message[user_id] = sent.message_id
+
         await callback.answer()
-    else:
         await callback.answer("Неизвестная команда", show_alert=True)
