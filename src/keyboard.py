@@ -1,14 +1,15 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-categories = ["Документы", "Учебный процесс", "Служба заботы", "Другое"]
 
-def get_main_keyboard(disabled_category: str | None = None):
-    keyboard = []
-    for cat in categories:
+def get_main_keyboard(disabled_category: str = None):
+    buttons = []
+    for cat in ["Документы", "Учебный процесс", "Служба заботы", "Другое"]:
         if cat == disabled_category:
-            continue
-        keyboard.append([InlineKeyboardButton(text=cat, callback_data=cat)])
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+            buttons.append([InlineKeyboardButton(text=f"• {cat}", callback_data="ignore")])
+        else:
+            buttons.append([InlineKeyboardButton(text=cat, callback_data=cat)])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 
 
 def get_submenu_keyboard(category: str):
