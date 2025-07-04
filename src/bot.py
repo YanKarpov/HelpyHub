@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from src.config import BOT_TOKEN
-from src.handlers import start_handler, callback_handler, feedback_message_handler
+from src.handlers import start_handler, callback_handler, feedback_message_handler, admin_reply_text_handler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,5 +19,8 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(start_handler, Command(commands=["start"]))
     dp.callback_query.register(callback_handler)
     dp.message.register(feedback_message_handler)
+
+    dp.message.register(admin_reply_text_handler)
+
 
 register_handlers(dp)
