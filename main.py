@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from bot import dp, bot
+from src.bot import dp, bot
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

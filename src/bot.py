@@ -4,8 +4,8 @@ from aiogram.filters import Command
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config import BOT_TOKEN
-from handlers import start_handler, callback_handler
+from src.config import BOT_TOKEN
+from src.handlers import start_handler, callback_handler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
