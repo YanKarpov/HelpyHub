@@ -9,6 +9,7 @@ from aiogram.types import (
 )
 from src.keyboard import get_main_keyboard, get_submenu_keyboard, get_reply_to_user_keyboard
 from src.config import GROUP_CHAT_ID
+from src.state import user_feedback_waiting, admin_replying
 
 # Константы 
 categories = ["Документы", "Учебный процесс", "Служба заботы", "Другое"]
@@ -27,14 +28,9 @@ category_texts = {
     "Другое": "Разные полезные сведения.",
 }
 
-# Глобальные словари-состояния 
-user_feedback_waiting = {}
-admin_replying = {}
-
 # Логирование
 logger = logging.getLogger(__name__)
 
-# Вспомогательные функции
 async def save_feedback_state(user_id: int, **kwargs):
     if user_id in user_feedback_waiting:
         user_feedback_waiting[user_id].update(kwargs)
@@ -208,15 +204,26 @@ async def feedback_message_handler(message: Message):
 # Хендлер: Ответ от админа пользователю 
 async def admin_reply_text_handler(message: Message):
     admin_id = message.from_user.id
-    if admin_id not in admin_replying:
+    logger.info(f"admin_reply_text_handler called from user {admin_id}")
+
+    user_id = admin_replying.get(admin_id)
+    if user_id is None:
         logger.info(f"Message from user {admin_id} ignored in admin reply handler (not replying now)")
         return
 
-    user_id = admin_replying.pop(admin_id)
+    logger.info(f"Admin {admin_id} is replying to user {user_id} with text: {message.text!r}")
+
     try:
         await message.bot.send_message(chat_id=user_id, text=f"Ответ от службы поддержки:\n\n{message.text}")
+        logger.info(f"Message successfully sent to user {user_id}")
+
         await message.reply("Сообщение успешно отправлено пользователю.")
-        logger.info(f"Admin {admin_id} sent reply to user {user_id}")
+        logger.info(f"Admin {admin_id} notified about successful sending")
+
+        # Удаляем только после успешной отправки
+        admin_replying.pop(admin_id, None)
+        logger.info(f"Removed admin {admin_id} from admin_replying")
+
     except Exception as e:
-        logger.error(f"Error sending admin reply: {e}")
+        logger.error(f"Error sending admin reply from admin {admin_id} to user {user_id}: {e}")
         await message.reply(f"Ошибка отправки: {e}")
