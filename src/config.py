@@ -17,6 +17,6 @@ try:
 except ValueError:
     raise ValueError("GROUP_CHAT_ID должен быть числом (int), проверь .env файл.")
 
-print("Config: GROUP_CHAT_ID =", GROUP_CHAT_ID, type(GROUP_CHAT_ID))
-print("Config: BOT_TOKEN =", BOT_TOKEN, type(GROUP_CHAT_ID))
+# print("Config: GROUP_CHAT_ID =", GROUP_CHAT_ID, type(GROUP_CHAT_ID))
+# print("Config: BOT_TOKEN =", BOT_TOKEN, type(GROUP_CHAT_ID))
 

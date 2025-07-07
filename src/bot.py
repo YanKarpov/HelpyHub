@@ -1,14 +1,20 @@
-import logging
 from aiogram.filters import Command
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from src.config import BOT_TOKEN
-from src.handlers import start_handler, callback_handler, feedback_message_handler, admin_reply_text_handler, admin_replying
+from src.handlers.start import start_handler
+from src.handlers.callback import callback_handler
+from src.handlers.feedback import feedback_message_handler
+from src.handlers.admin_reply import admin_reply_text_handler, admin_replying
 
 from aiogram.types import Message
 from aiogram.filters import Filter
+
+
+from src.logger import setup_logger
+logger = setup_logger(__name__)
 
 class IsAdminReplying(Filter):
     async def __call__(self, message: Message) -> bool:
@@ -17,9 +23,6 @@ class IsAdminReplying(Filter):
         return result
 
     
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
