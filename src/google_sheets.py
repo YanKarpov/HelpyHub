@@ -15,7 +15,10 @@ SPREADSHEET_ID = config.SPREADSHEET_ID
 sh = gc.open_by_key(SPREADSHEET_ID)
 worksheet = sh.sheet1
 
-def append_feedback_to_sheet(user_id, username, category, message_text, answer_text="", admin_id="", status="Ожидает ответа"):
+def append_feedback_to_sheet(
+    user_id, username, category, message_text,
+    answer_text="", admin_id="", admin_username="", status="Ожидает ответа"
+):
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
@@ -29,26 +32,31 @@ def append_feedback_to_sheet(user_id, username, category, message_text, answer_t
         message_text,
         answer_text,
         admin_id,
+        admin_username,
         status
     ]
 
     worksheet.append_row(row)
 
-def update_feedback_in_sheet(user_id, answer_text, admin_id, new_status="Вопрос закрыт"):
+
+def update_feedback_in_sheet(
+    user_id, answer_text, admin_id,
+    admin_username="", new_status="Вопрос закрыт"
+):
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
 
     all_records = worksheet.get_all_records()
 
-    for idx, record in enumerate(all_records, start=2): 
+    for idx, record in enumerate(all_records, start=2):
         if str(record.get('user_id', '')).strip() == str(user_id) and record.get('Статус', '').strip() == "Ожидает ответа":
-            worksheet.update(f'A{idx}', [[date_str]])       # Дата
-            worksheet.update(f'B{idx}', [[time_str]])       # Время
-            worksheet.update(f'G{idx}', [[answer_text]])    # Ответ
-            worksheet.update(f'H{idx}', [[str(admin_id)]])  # ID админа
-            worksheet.update(f'I{idx}', [[new_status]])     # Статус
-
+            worksheet.update(f'A{idx}', [[date_str]])           # Дата
+            worksheet.update(f'B{idx}', [[time_str]])           # Время
+            worksheet.update(f'G{idx}', [[answer_text]])        # Ответ
+            worksheet.update(f'H{idx}', [[str(admin_id)]])      # ID админа
+            worksheet.update(f'I{idx}', [[admin_username]])     # admin_username 
+            worksheet.update(f'J{idx}', [[new_status]])         # Статус
             return True
 
     return False

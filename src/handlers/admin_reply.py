@@ -20,17 +20,17 @@ async def admin_reply_text_handler(message: Message):
     logger.info(f"Admin {admin_id} is replying to user {user_id} with text: {message.text!r}")
 
     try:
-        # Отправляем ответ пользователю
         await message.bot.send_message(chat_id=int(user_id), text=f"Ответ от службы поддержки:\n\n{message.text}")
         await message.reply("Сообщение успешно отправлено пользователю.")
+        admin_username = message.from_user.username or ""
 
-        # Обновляем существующую запись в Google Sheets (обновить эту функцию в google_sheets.py)
         await asyncio.get_event_loop().run_in_executor(
             None,
             update_feedback_in_sheet,
             int(user_id),
             message.text,
             str(admin_id),
+            admin_username,
             "Отвечено"
         )
 

@@ -51,9 +51,10 @@ async def feedback_message_handler(message: Message):
             username,
             category,
             message.text,
-            "",
-            "",
-            "Ожидает ответа"
+            "",     
+            "",      
+            "",      
+            "Ожидает ответа"  
         )
         logger.info(f"Feedback from user {user_id} saved to Google Sheets")
     except Exception as e:
