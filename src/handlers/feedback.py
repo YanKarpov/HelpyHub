@@ -2,8 +2,8 @@ from aiogram.types import Message, FSInputFile, InputMediaPhoto, InlineKeyboardM
 from src.keyboard import get_reply_to_user_keyboard
 from src.config import GROUP_CHAT_ID
 from src.logger import setup_logger
-from src.redis_client import redis_client  
-from src.google_sheets import append_feedback_to_sheet  
+from src.services.redis_client import redis_client  
+from src.services.google_sheets import append_feedback_to_sheet  
 
 logger = setup_logger(__name__)
 

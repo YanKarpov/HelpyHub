@@ -1,5 +1,5 @@
 from aiogram.types import FSInputFile, InputMediaPhoto
-from src.redis_client import redis_client
+from src.services.redis_client import redis_client
 
 from src.logger import setup_logger
 

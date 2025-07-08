@@ -2,7 +2,7 @@ from aiogram.types import CallbackQuery
 from src.keyboard import get_main_keyboard, get_submenu_keyboard
 from src.handlers.utils import save_feedback_state, send_or_edit_media
 from src.logger import setup_logger
-from src.redis_client import redis_client
+from src.services.redis_client import redis_client
 
 logger = setup_logger(__name__)
 

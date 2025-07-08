@@ -1,7 +1,7 @@
 from aiogram.types import Message
-from src.redis_client import redis_client
+from src.services.redis_client import redis_client
 from src.logger import setup_logger
-from src.google_sheets import update_feedback_in_sheet
+from src.services.google_sheets import update_feedback_in_sheet
 import asyncio
 
 logger = setup_logger(__name__)
