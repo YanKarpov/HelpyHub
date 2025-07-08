@@ -1,11 +1,11 @@
 from aiogram.types import CallbackQuery
 from src.keyboard import get_main_keyboard, get_submenu_keyboard
-from src.state import admin_replying
 from src.handlers.utils import save_feedback_state, send_or_edit_media
-
 from src.logger import setup_logger
+from src.redis_client import redis_client
 
 logger = setup_logger(__name__)
+
 
 categories = ["Документы", "Учебный процесс", "Служба заботы", "Другое"]
 
@@ -35,10 +35,13 @@ async def callback_handler(callback: CallbackQuery):
 
     if data.startswith("reply_to_user:"):
         try:
-            admin_replying[callback.from_user.id] = int(data.split(":", 1)[1])
-            await callback.answer("Напиши сообщение для пользователя в этом чате")
-            await callback.message.answer(f"Ответ пользователю ID {admin_replying[callback.from_user.id]}:")
-            logger.info(f"Admin {callback.from_user.id} replying to user {admin_replying[callback.from_user.id]}")
+            target_user_id = int(data.split(":", 1)[1])
+            await redis_client.set(f"admin_replying:{user_id}", target_user_id, ex=1800)
+
+            new_text = callback.message.text + "\n\nНапишите ответ для пользователя и я его отправлю"
+            await callback.message.edit_text(new_text)
+
+            logger.info(f"Admin {user_id} replying to user {target_user_id}")
         except ValueError:
             logger.error(f"Invalid user ID in reply_to_user: {data}")
             await callback.answer("Некорректный ID", show_alert=True)

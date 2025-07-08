@@ -1,6 +1,5 @@
 from aiogram.types import FSInputFile, InputMediaPhoto
-
-from src.state import user_feedback_waiting
+from src.redis_client import redis_client
 
 from src.logger import setup_logger
 
@@ -8,11 +7,11 @@ logger = setup_logger(__name__)
 
 
 async def save_feedback_state(user_id: int, **kwargs):
-    if user_id in user_feedback_waiting:
-        user_feedback_waiting[user_id].update(kwargs)
-    else:
-        user_feedback_waiting[user_id] = kwargs
-    logger.info(f"Feedback state updated for user {user_id}: {user_feedback_waiting[user_id]}")
+    key = f"feedback_state:{user_id}"
+    await redis_client.hset(key, mapping=kwargs)
+    await redis_client.expire(key, 3600)  
+    state = await redis_client.hgetall(key)
+    logger.info(f"Feedback state updated for user {user_id}: {state}")
 
 async def send_or_edit_media(message_or_cb, photo_path, caption, reply_markup):
     media = InputMediaPhoto(media=FSInputFile(photo_path), caption=caption)

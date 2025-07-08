@@ -1,20 +1,24 @@
 from aiogram.types import Message, FSInputFile, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
-from src.state import user_feedback_waiting
 from src.keyboard import get_reply_to_user_keyboard
 from src.config import GROUP_CHAT_ID
-
 from src.logger import setup_logger
+from src.redis_client import redis_client  
 
 logger = setup_logger(__name__)
+
 async def feedback_message_handler(message: Message):
     user_id = message.from_user.id
-    if user_id not in user_feedback_waiting:
+    feedback_key = f"feedback_state:{user_id}"  # заменить здесь
+
+    feedback = await redis_client.hgetall(feedback_key)
+    if not feedback:
         logger.info(f"Received feedback message from user {user_id} but no feedback expected")
         return
 
-    feedback = user_feedback_waiting.pop(user_id)
+    await redis_client.delete(feedback_key)
+
     text = (
-        f"Новое обращение от @{message.from_user.username or message.from_user.full_name}:\n"
+        f"Новое обращение от Анонимуса:\n"
         f"Категория: {feedback.get('type')}\n\n{message.text}"
     )
 
@@ -29,9 +33,10 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.error(f"Failed to send message to support group: {e}")
 
-    if (msg_id := feedback.get("prompt_message_id")):
+    prompt_message_id = feedback.get("prompt_message_id")
+    if prompt_message_id:
         try:
-            await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            await message.bot.delete_message(chat_id=message.chat.id, message_id=int(prompt_message_id))
         except Exception as e:
             logger.warning(f"Failed to delete prompt message: {e}")
 
@@ -46,11 +51,12 @@ async def feedback_message_handler(message: Message):
         inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main")]]
     )
 
-    if (menu_id := feedback.get("menu_message_id")):
+    menu_message_id = feedback.get("menu_message_id")
+    if menu_message_id:
         try:
             await message.bot.edit_message_media(
                 chat_id=message.chat.id,
-                message_id=menu_id,
+                message_id=int(menu_message_id),
                 media=InputMediaPhoto(media=ack_photo, caption=ack_caption),
                 reply_markup=back_btn
             )
