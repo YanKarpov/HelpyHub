@@ -17,6 +17,15 @@ try:
 except ValueError:
     raise ValueError("GROUP_CHAT_ID должен быть числом (int), проверь .env файл.")
 
+GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT")
+SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
+
+if not GOOGLE_SERVICE_ACCOUNT_FILE:
+    raise ValueError("Переменная окружения GOOGLE_SERVICE_ACCOUNT_FILE не установлена!")
+
+if not SPREADSHEET_ID:
+    raise ValueError("Переменная окружения SPREADSHEET_ID не установлена!")
+
 # print("Config: GROUP_CHAT_ID =", GROUP_CHAT_ID, type(GROUP_CHAT_ID))
 # print("Config: BOT_TOKEN =", BOT_TOKEN, type(GROUP_CHAT_ID))
 

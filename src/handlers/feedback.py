@@ -8,7 +8,7 @@ logger = setup_logger(__name__)
 
 async def feedback_message_handler(message: Message):
     user_id = message.from_user.id
-    feedback_key = f"feedback_state:{user_id}"  # заменить здесь
+    feedback_key = f"feedback_state:{user_id}"  
 
     feedback = await redis_client.hgetall(feedback_key)
     if not feedback:
