@@ -1,7 +1,6 @@
 from aiogram.filters import Command
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
-import redis.asyncio as redis
 
 from src.config import BOT_TOKEN
 from src.handlers.start import start_handler
@@ -25,7 +24,6 @@ dp = Dispatcher(storage=storage)
 
 class IsAdminReplying(Filter):
     async def __call__(self, message: Message) -> bool:
-        # Проверяем, есть ли ключ в Redis — admin_replying:{user_id}
         result = await redis_client.exists(f"admin_replying:{message.from_user.id}")
         logger.info(f"IsAdminReplying filter: user_id={message.from_user.id} result={bool(result)}")
         return bool(result)
