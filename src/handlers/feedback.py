@@ -95,7 +95,7 @@ async def feedback_message_handler(message: Message):
 
     # Показываем пользователю сообщение об успешной отправке
     ack_caption = "Спасибо! Твое сообщение отправлено в службу поддержки."
-    ack_photo = FSInputFile("images/other.webp")
+    ack_photo = FSInputFile("assets/images/other.webp")
     back_btn = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main")]]
     )

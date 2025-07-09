@@ -1,6 +1,6 @@
 from aiogram.types import Message, FSInputFile
 from src.keyboard import get_main_keyboard
-from src.utils.utils import save_feedback_state
+from src.utils.media_utils import save_feedback_state
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)

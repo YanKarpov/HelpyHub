@@ -4,7 +4,7 @@ from src.keyboard import (
     get_submenu_keyboard,
     get_identity_choice_keyboard
 )
-from src.utils.utils import save_feedback_state, send_or_edit_media
+from src.utils.media_utils import save_feedback_state, send_or_edit_media
 from src.utils.logger import setup_logger
 from src.services.redis_client import redis_client
 from aiogram.types.input_file import FSInputFile
@@ -15,10 +15,10 @@ logger = setup_logger(__name__)
 categories = ["Документы", "Учебный процесс", "Служба заботы", "Другое"]
 
 category_pictures = {
-    "Документы": "images/documents.jpg",
-    "Учебный процесс": "images/study.jpg",
-    "Служба заботы": "images/support.jpg",
-    "Другое": "images/other.webp",
+    "Документы": "assets/images/documents.jpg",
+    "Учебный процесс": "assets/images/study.jpg",
+    "Служба заботы": "assets/images/support.jpg",
+    "Другое": "assets/images/other.webp",
 }
 
 category_texts = {
@@ -59,7 +59,7 @@ async def callback_handler(callback: CallbackQuery):
     if data == "back_to_main":
         msg = await send_or_edit_media(
             callback.message,
-            "images/other.webp",
+            "assets/images/other.webp",
             f"Привет, {callback.from_user.full_name}!\nЯ знаю, что у тебя вопрос и я постараюсь его решить ❤️",
             get_main_keyboard()
         )
@@ -100,7 +100,7 @@ async def callback_handler(callback: CallbackQuery):
 
         await save_feedback_state(user_id, type=decoded_type, is_named=is_named)
 
-        picture_path = category_pictures.get(decoded_type, "images/other.webp")
+        picture_path = category_pictures.get(decoded_type, "assets/images/other.webp")
 
         from aiogram.types import InputMediaPhoto
 
