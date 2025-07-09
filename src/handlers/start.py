@@ -8,7 +8,7 @@ logger = setup_logger(__name__)
 async def start_handler(message: Message):
     logger.info(f"/start received from user {message.from_user.id}")
     caption = f"Привет, {message.from_user.full_name}!\nЯ знаю, что у тебя вопрос и я постараюсь его решить ❤️"
-    photo = FSInputFile("images/other.webp")
+    photo = FSInputFile("assets/images/other.webp")
 
     sent = await message.answer_photo(photo=photo, caption=caption, reply_markup=get_main_keyboard())
     await save_feedback_state(message.from_user.id, menu_message_id=sent.message_id)

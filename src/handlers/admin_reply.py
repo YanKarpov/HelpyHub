@@ -1,5 +1,5 @@
 from aiogram.types import Message
-from src.services.redis_client import redis_client
+from src.services.redis_client import redis_client, unlock_feedback
 from src.utils.logger import setup_logger
 from src.services.google_sheets import update_feedback_in_sheet
 import asyncio
@@ -34,7 +34,10 @@ async def admin_reply_text_handler(message: Message):
             "Вопрос закрыт"
         )
 
+        await unlock_feedback(int(user_id))
+
         await redis_client.delete(f"admin_replying:{admin_id}")
+
     except Exception as e:
         logger.error(f"Error sending admin reply from admin {admin_id} to user {user_id}: {e}")
         await message.reply(f"Ошибка отправки: {e}")

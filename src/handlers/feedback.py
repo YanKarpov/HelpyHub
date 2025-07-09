@@ -3,14 +3,22 @@ from aiogram.types import Message, FSInputFile, InputMediaPhoto, InlineKeyboardM
 from src.keyboard import get_reply_to_user_keyboard
 from src.utils.config import GROUP_CHAT_ID
 from src.utils.logger import setup_logger
-from src.services.redis_client import redis_client
+from src.services.redis_client import redis_client, can_create_new_feedback, lock_feedback
 from src.services.google_sheets import append_feedback_to_sheet
 
 logger = setup_logger(__name__)
 
-
 async def feedback_message_handler(message: Message):
     user_id = message.from_user.id
+
+    # Проверяем, есть ли уже открытое обращение (блокировка)
+    if not await can_create_new_feedback(user_id):
+        await message.answer("❗️ У вас уже есть открытое обращение. Пожалуйста, дождитесь ответа на предыдущее перед созданием нового.")
+        return
+
+    # Ставим блокировку на создание нового обращения
+    await lock_feedback(user_id)
+
     feedback_key = f"feedback_state:{user_id}"
 
     # Декодер значений из Redis
@@ -33,7 +41,6 @@ async def feedback_message_handler(message: Message):
     username = message.from_user.username or ""
     full_name = message.from_user.full_name
 
-    # Определяем, как отображать отправителя
     if is_named:
         sender_display_name = f"@{username}" if username else full_name
     else:
@@ -44,7 +51,7 @@ async def feedback_message_handler(message: Message):
         f"Категория: {category}\n\n{message.text}"
     )
 
-    # Отправка сообщения в группу
+    # Отправляем в группу поддержки
     try:
         await message.bot.send_message(
             chat_id=GROUP_CHAT_ID,
@@ -55,7 +62,7 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.error(f"Failed to send message to support group: {e}")
 
-    # Сохраняем в Google Таблицу
+    # Сохраняем в Google Sheets (выполняется в отдельном потоке)
     try:
         await asyncio.get_event_loop().run_in_executor(
             None,
@@ -68,7 +75,7 @@ async def feedback_message_handler(message: Message):
             "",          # admin_id
             "",          # admin_username
             "Ожидает ответа",
-            is_named    
+            is_named
         )
         logger.info(f"Feedback from user {user_id} saved to Google Sheets")
     except Exception as e:
@@ -93,7 +100,7 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.warning(f"Failed to delete user message: {e}")
 
-    # Показываем пользователю сообщение об успешной отправке
+    # Показываем подтверждение отправки пользователю
     ack_caption = "Спасибо! Твое сообщение отправлено в службу поддержки."
     ack_photo = FSInputFile("assets/images/other.webp")
     back_btn = InlineKeyboardMarkup(

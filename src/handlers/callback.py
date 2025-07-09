@@ -6,7 +6,7 @@ from src.keyboard import (
 )
 from src.utils.media_utils import save_feedback_state, send_or_edit_media
 from src.utils.logger import setup_logger
-from src.services.redis_client import redis_client
+from src.services.redis_client import redis_client, can_create_new_feedback
 from aiogram.types.input_file import FSInputFile
 
 
@@ -75,11 +75,15 @@ async def callback_handler(callback: CallbackQuery):
 
     # Подкатегории с уточнением личности
     if data in ["Проблемы с техникой", "Обратная связь"]:
+        if not await can_create_new_feedback(user_id):
+            await callback.answer("❗️ У вас уже есть открытое обращение.\nПожалуйста, дождитесь ответа.", show_alert=True)
+            return
+
         await redis_client.set(f"feedback_type:{user_id}", data, ex=300)
 
         msg = await send_or_edit_media(
             callback.message,
-            category_pictures.get(data, "images/other.webp"),
+            category_pictures.get(data, "assets/images/other.webp"),
             "Хочешь остаться анонимом или указать своё имя?",
             get_identity_choice_keyboard()
         )
@@ -87,6 +91,7 @@ async def callback_handler(callback: CallbackQuery):
 
         await callback.answer()
         return
+
 
     # Выбор: анонимно или с именем
     if data in ["send_anonymous", "send_named"]:
