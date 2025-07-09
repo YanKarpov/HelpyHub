@@ -1,11 +1,16 @@
 from aiogram.types import CallbackQuery
-from src.keyboard import get_main_keyboard, get_submenu_keyboard
+from src.keyboard import (
+    get_main_keyboard,
+    get_submenu_keyboard,
+    get_identity_choice_keyboard
+)
 from src.handlers.utils import save_feedback_state, send_or_edit_media
 from src.logger import setup_logger
 from src.services.redis_client import redis_client
+from aiogram.types.input_file import FSInputFile
+
 
 logger = setup_logger(__name__)
-
 
 categories = ["Документы", "Учебный процесс", "Служба заботы", "Другое"]
 
@@ -23,6 +28,8 @@ category_texts = {
     "Другое": "Разные полезные сведения.",
 }
 
+def safe_decode(value):
+    return value.decode("utf-8") if isinstance(value, bytes) else value
 
 async def callback_handler(callback: CallbackQuery):
     data = callback.data
@@ -33,6 +40,7 @@ async def callback_handler(callback: CallbackQuery):
         await save_feedback_state(user_id, menu_message_id=msg.message_id)
         logger.info(f"Menu message id={msg.message_id} saved for user {user_id}")
 
+    # Ответ админа пользователю
     if data.startswith("reply_to_user:"):
         try:
             target_user_id = int(data.split(":", 1)[1])
@@ -47,6 +55,7 @@ async def callback_handler(callback: CallbackQuery):
             await callback.answer("Некорректный ID", show_alert=True)
         return
 
+    # Возврат в главное меню
     if data == "back_to_main":
         msg = await send_or_edit_media(
             callback.message,
@@ -58,18 +67,60 @@ async def callback_handler(callback: CallbackQuery):
         await callback.answer()
         return
 
+    # Игнорирование повторного выбора
     if data == "ignore":
         await callback.answer("Вы уже здесь 😉", show_alert=True)
         logger.info(f"User {user_id} pressed ignore")
         return
 
+    # Подкатегории с уточнением личности
     if data in ["Проблемы с техникой", "Обратная связь"]:
-        prompt_msg = await callback.message.answer(f"Опиши проблему по теме '{data}':")
-        await save_feedback_state(user_id, type=data, prompt_message_id=prompt_msg.message_id)
-        logger.info(f"Feedback prompt sent to user {user_id} for type {data}")
+        await redis_client.set(f"feedback_type:{user_id}", data, ex=300)
+
+        msg = await send_or_edit_media(
+            callback.message,
+            category_pictures.get(data, "images/other.webp"),
+            "Хочешь остаться анонимом или указать своё имя?",
+            get_identity_choice_keyboard()
+        )
+        await save_feedback_state(user_id, menu_message_id=msg.message_id)
+
         await callback.answer()
         return
 
+    # Выбор: анонимно или с именем
+    if data in ["send_anonymous", "send_named"]:
+        feedback_type = await redis_client.get(f"feedback_type:{user_id}")
+        if not feedback_type:
+            await callback.answer("Что-то пошло не так. Попробуй ещё раз.", show_alert=True)
+            return
+
+        decoded_type = safe_decode(feedback_type)
+        is_named = data == "send_named"
+
+        await save_feedback_state(user_id, type=decoded_type, is_named=is_named)
+
+        picture_path = category_pictures.get(decoded_type, "images/other.webp")
+
+        from aiogram.types import InputMediaPhoto
+
+        await callback.message.edit_media(
+            media=InputMediaPhoto(
+                media=FSInputFile(picture_path),
+                caption=f"Опиши проблему по теме '{decoded_type}':"
+            ),
+            reply_markup=None
+        )
+
+
+        await save_feedback_state(user_id, prompt_message_id=callback.message.message_id)
+
+        logger.info(f"Feedback prompt sent to user {user_id} (named={is_named}) for type {decoded_type}")
+        await callback.answer()
+        return
+
+
+    # Подменю "Другое"
     if data == "Другое":
         msg = await send_or_edit_media(
             callback.message,
@@ -81,6 +132,7 @@ async def callback_handler(callback: CallbackQuery):
         await callback.answer()
         return
 
+    # Основные категории
     if data in categories:
         msg = await send_or_edit_media(
             callback.message,
@@ -92,5 +144,6 @@ async def callback_handler(callback: CallbackQuery):
         await callback.answer()
         return
 
+    # Неизвестная команда
     logger.warning(f"Unknown callback data received: {data}")
     await callback.answer("Неизвестная команда", show_alert=True)

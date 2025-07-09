@@ -17,17 +17,22 @@ worksheet = sh.sheet1
 
 def append_feedback_to_sheet(
     user_id, username, category, message_text,
-    answer_text="", admin_id="", admin_username="", status="Ожидает ответа"
+    answer_text="", admin_id="", admin_username="", status="Ожидает ответа",
+    is_named=True
 ):
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
 
+    row_user_id = str(user_id)
+
+    row_username = username if is_named else "Анонимус"
+
     row = [
         date_str,
         time_str,
-        str(user_id),
-        username or "",
+        row_user_id,
+        row_username,
         category,
         message_text,
         answer_text,
@@ -37,7 +42,6 @@ def append_feedback_to_sheet(
     ]
 
     worksheet.append_row(row)
-
 
 def update_feedback_in_sheet(
     user_id, answer_text, admin_id,

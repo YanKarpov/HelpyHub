@@ -1,8 +1,11 @@
 import subprocess
 import sys
 import time
+import os
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+
+IGNORED_DIRS = {"venv"}
 
 class RestartOnChangeHandler(FileSystemEventHandler):
     def __init__(self, script_path):
@@ -18,9 +21,15 @@ class RestartOnChangeHandler(FileSystemEventHandler):
         self.process = subprocess.Popen([sys.executable, self.script_path])
 
     def on_modified(self, event):
-        if event.src_path.endswith('.py'):
-            print(f"Файл изменён: {event.src_path}. Перезапуск бота...")
-            self.restart()
+        if not event.src_path.endswith(".py"):
+            return
+
+        if any(ignored in event.src_path.split(os.sep) for ignored in IGNORED_DIRS):
+            return
+
+        print(f"Файл изменён: {event.src_path}. Перезапуск бота...")
+        self.restart()
+
 
 if __name__ == "__main__":
     script = "main.py"  

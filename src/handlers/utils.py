@@ -8,10 +8,15 @@ logger = setup_logger(__name__)
 
 async def save_feedback_state(user_id: int, **kwargs):
     key = f"feedback_state:{user_id}"
-    await redis_client.hset(key, mapping=kwargs)
-    await redis_client.expire(key, 3600)  
+
+    str_mapping = {k: str(v) for k, v in kwargs.items()}
+
+    await redis_client.hset(key, mapping=str_mapping)
+    await redis_client.expire(key, 3600)
+
     state = await redis_client.hgetall(key)
     logger.info(f"Feedback state updated for user {user_id}: {state}")
+
 
 async def send_or_edit_media(message_or_cb, photo_path, caption, reply_markup):
     media = InputMediaPhoto(media=FSInputFile(photo_path), caption=caption)
