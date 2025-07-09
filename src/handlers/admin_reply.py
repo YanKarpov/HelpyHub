@@ -31,7 +31,7 @@ async def admin_reply_text_handler(message: Message):
             message.text,
             str(admin_id),
             admin_username,
-            "Отвечено"
+            "Вопрос закрыт"
         )
 
         await redis_client.delete(f"admin_replying:{admin_id}")
