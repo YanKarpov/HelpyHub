@@ -1,12 +1,13 @@
 import asyncio
-import logging
 
-from src.bot import dp, bot
+from src.bot import dp, bot, register_handlers
+from src.logger import setup_logger
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 async def main():
+    register_handlers(dp)  
+
     logger.info("Бот запущен и ждёт команды.")
     await dp.start_polling(bot)
 
