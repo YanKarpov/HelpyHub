@@ -2,7 +2,7 @@ import asyncio
 import sys
 
 from src.bot import dp, bot, register_handlers, redis_client
-from src.logger import setup_logger
+from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 

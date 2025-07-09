@@ -1,8 +1,8 @@
 import asyncio
 from aiogram.types import Message, FSInputFile, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
 from src.keyboard import get_reply_to_user_keyboard
-from src.config import GROUP_CHAT_ID
-from src.logger import setup_logger
+from src.utils.config import GROUP_CHAT_ID
+from src.utils.logger import setup_logger
 from src.services.redis_client import redis_client
 from src.services.google_sheets import append_feedback_to_sheet
 

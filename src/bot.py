@@ -2,7 +2,7 @@ from aiogram.filters import Command
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 
-from src.config import BOT_TOKEN
+from src.utils.config import BOT_TOKEN
 from src.handlers.start import start_handler
 from src.handlers.callback import callback_handler
 from src.handlers.feedback import feedback_message_handler
@@ -12,10 +12,8 @@ from src.services.redis_client import redis_client
 from aiogram.types import Message
 from aiogram.filters import Filter
 
-from src.logger import setup_logger
+from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
-
-
 
 storage = RedisStorage(redis=redis_client)
 

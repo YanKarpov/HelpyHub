@@ -4,8 +4,8 @@ from src.keyboard import (
     get_submenu_keyboard,
     get_identity_choice_keyboard
 )
-from src.handlers.utils import save_feedback_state, send_or_edit_media
-from src.logger import setup_logger
+from src.utils.utils import save_feedback_state, send_or_edit_media
+from src.utils.logger import setup_logger
 from src.services.redis_client import redis_client
 from aiogram.types.input_file import FSInputFile
 

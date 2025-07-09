@@ -1,6 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-
 def get_main_keyboard(disabled_category: str = None):
     buttons = []
     for cat in ["Документы", "Учебный процесс", "Служба заботы", "Другое"]:
@@ -9,7 +8,6 @@ def get_main_keyboard(disabled_category: str = None):
         else:
             buttons.append([InlineKeyboardButton(text=cat, callback_data=cat)])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
-
 
 
 def get_submenu_keyboard(category: str):
