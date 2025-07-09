@@ -73,10 +73,13 @@ async def callback_handler(callback: CallbackQuery):
         logger.info(f"User {user_id} pressed ignore")
         return
 
-    # Подкатегории с уточнением личности
     if data in ["Проблемы с техникой", "Обратная связь"]:
         if not await can_create_new_feedback(user_id):
-            await callback.answer("❗️ У вас уже есть открытое обращение.\nПожалуйста, дождитесь ответа.", show_alert=True)
+            await callback.answer(
+                "❗️ У вас уже есть открытое обращение. Дождитесь ответа перед созданием нового. ❗️",
+                show_alert=True
+            )
+            logger.info(f"User {user_id} attempted to start new feedback while blocked")
             return
 
         await redis_client.set(f"feedback_type:{user_id}", data, ex=300)
@@ -91,7 +94,6 @@ async def callback_handler(callback: CallbackQuery):
 
         await callback.answer()
         return
-
 
     # Выбор: анонимно или с именем
     if data in ["send_anonymous", "send_named"]:
@@ -116,7 +118,6 @@ async def callback_handler(callback: CallbackQuery):
             ),
             reply_markup=None
         )
-
 
         await save_feedback_state(user_id, prompt_message_id=callback.message.message_id)
 

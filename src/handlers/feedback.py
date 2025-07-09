@@ -10,6 +10,12 @@ logger = setup_logger(__name__)
 
 async def feedback_message_handler(message: Message):
     user_id = message.from_user.id
+    feedback_key = f"feedback_state:{user_id}"
+
+    feedback = await redis_client.hgetall(feedback_key)
+    if not feedback:
+        logger.info(f"User {user_id} sent a message, but feedback not expected. Ignoring.")
+        return  
 
     # Проверяем, есть ли уже открытое обращение (блокировка)
     if not await can_create_new_feedback(user_id):
@@ -19,19 +25,9 @@ async def feedback_message_handler(message: Message):
     # Ставим блокировку на создание нового обращения
     await lock_feedback(user_id)
 
-    feedback_key = f"feedback_state:{user_id}"
-
     # Декодер значений из Redis
     def decode(value):
-        if isinstance(value, bytes):
-            return value.decode('utf-8')
-        return value
-
-    # Получаем сохранённое состояние
-    feedback = await redis_client.hgetall(feedback_key)
-    if not feedback:
-        logger.info(f"Received feedback message from user {user_id} but no feedback expected")
-        return
+        return value.decode('utf-8') if isinstance(value, bytes) else value
 
     category = decode(feedback.get('type', 'Не указана'))
     is_named = decode(feedback.get('is_named', 'False')) == 'True'
@@ -40,11 +36,7 @@ async def feedback_message_handler(message: Message):
 
     username = message.from_user.username or ""
     full_name = message.from_user.full_name
-
-    if is_named:
-        sender_display_name = f"@{username}" if username else full_name
-    else:
-        sender_display_name = "Анонимус"
+    sender_display_name = f"@{username}" if (is_named and username) else (full_name if is_named else "Анонимус")
 
     text = (
         f"Новое обращение от {sender_display_name}:\n"
@@ -62,7 +54,7 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.error(f"Failed to send message to support group: {e}")
 
-    # Сохраняем в Google Sheets (выполняется в отдельном потоке)
+    # Сохраняем в Google Sheets
     try:
         await asyncio.get_event_loop().run_in_executor(
             None,
@@ -71,9 +63,9 @@ async def feedback_message_handler(message: Message):
             sender_display_name,
             category,
             message.text,
-            "",          # answer_text
-            "",          # admin_id
-            "",          # admin_username
+            "",  # answer_text
+            "",  # admin_id
+            "",  # admin_username
             "Ожидает ответа",
             is_named
         )
@@ -87,7 +79,7 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.warning(f"Failed to delete feedback key from Redis: {e}")
 
-    # Удаляем промпт
+    # Удаляем промпт-сообщение
     if prompt_message_id:
         try:
             await message.bot.delete_message(chat_id=message.chat.id, message_id=int(prompt_message_id))
