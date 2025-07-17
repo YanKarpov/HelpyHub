@@ -5,6 +5,11 @@ from src.utils.config import GROUP_CHAT_ID
 from src.utils.logger import setup_logger
 from src.services.redis_client import redis_client, can_create_new_feedback, lock_feedback
 from src.services.google_sheets import append_feedback_to_sheet
+from src.utils.categories import (
+    FEEDBACK_NOTIFICATION_TEMPLATE,
+    ACKNOWLEDGMENT_CAPTION,
+    ACKNOWLEDGMENT_IMAGE_PATH,
+)
 
 logger = setup_logger(__name__)
 
@@ -38,9 +43,10 @@ async def feedback_message_handler(message: Message):
     full_name = message.from_user.full_name
     sender_display_name = f"@{username}" if (is_named and username) else (full_name if is_named else "Анонимус")
 
-    text = (
-        f"Новое обращение от {sender_display_name}:\n"
-        f"Категория: {category}\n\n{message.text}"
+    text = FEEDBACK_NOTIFICATION_TEMPLATE.format(
+        sender_display_name=sender_display_name,
+        category=category,
+        message_text=message.text,
     )
 
     # Отправляем в группу поддержки
@@ -92,9 +98,8 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.warning(f"Failed to delete user message: {e}")
 
-    # Показываем подтверждение отправки пользователю
-    ack_caption = "Спасибо! Твое сообщение отправлено в службу поддержки."
-    ack_photo = FSInputFile("assets/images/other.jpg")
+    ack_caption = ACKNOWLEDGMENT_CAPTION
+    ack_photo = FSInputFile(ACKNOWLEDGMENT_IMAGE_PATH)
     back_btn = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main")]]
     )
