@@ -4,9 +4,11 @@
 ├── assets
 │   └── images
 │       ├── documents.jpg
-│       ├── other.webp
+│       ├── other.jpg
 │       ├── study.jpg
-│       └── support.jpg
+│       ├── support.jpg
+│       ├── support_received.jpg
+│       └── welcome.jpg
 ├── docker-compose.yml
 ├── main.py
 ├── requirements.txt
