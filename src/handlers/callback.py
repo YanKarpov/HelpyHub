@@ -1,5 +1,8 @@
 from aiogram.types import CallbackQuery, InputMediaPhoto
 from aiogram.types.input_file import FSInputFile
+from aiogram.exceptions import TelegramBadRequest  
+import json
+
 
 from src.keyboard import (
     get_main_keyboard,
@@ -9,7 +12,7 @@ from src.keyboard import (
 from src.utils.media_utils import save_feedback_state, send_or_edit_media
 from src.utils.logger import setup_logger
 from src.services.redis_client import redis_client, can_create_new_feedback
-from src.utils.categories import CATEGORIES, CATEGORIES_LIST
+from src.utils.categories import CategoryInfo, CATEGORIES, CATEGORIES_LIST, START_INFO
 
 logger = setup_logger(__name__)
 
@@ -19,24 +22,62 @@ def safe_decode(value):
 
 
 async def update_category_messages(bot, user_id, image_msg_id, text_msg_id, info, disabled_category):
-    try:
-        await bot.edit_message_media(
-            chat_id=user_id,
-            message_id=image_msg_id,
-            media=InputMediaPhoto(media=FSInputFile(info.image))
-        )
-    except Exception as e:
-        logger.warning(f"Failed to edit image for user {user_id}: {e}")
+    state = await redis_client.hgetall(f"user_state:{user_id}")
+    prev_text = safe_decode(state.get("last_text", ""))
+    prev_image = safe_decode(state.get("last_image", ""))
+    prev_keyboard = safe_decode(state.get("last_keyboard", ""))
 
-    try:
-        await bot.edit_message_text(
-            chat_id=user_id,
-            message_id=text_msg_id,
-            text=info.text,
-            reply_markup=get_main_keyboard(disabled_category)
-        )
-    except Exception as e:
-        logger.warning(f"Failed to edit text for user {user_id}: {e}")
+    if info == CATEGORIES["Другое"]:
+        keyboard = get_submenu_keyboard("Другое")
+    else:
+        keyboard = get_main_keyboard(disabled_category)
+    keyboard_str = json.dumps(keyboard.model_dump())
+
+    logger.info(f"[text] old: {repr(prev_text)}")
+    logger.info(f"[text] new: {repr(info.text)}")
+    logger.info(f"[keyboard] old: {repr(prev_keyboard)}")
+    logger.info(f"[keyboard] new: {repr(keyboard_str)}")
+    logger.info(f"[image] old: {repr(prev_image)}")
+    logger.info(f"[image] new: {repr(info.image)}")
+
+    if info.image != prev_image:
+        try:
+            await bot.edit_message_media(
+                chat_id=user_id,
+                message_id=image_msg_id,
+                media=InputMediaPhoto(media=FSInputFile(info.image))
+            )
+            logger.info(f"[image] Updated for user {user_id}")
+        except TelegramBadRequest as e:
+            if "message is not modified" in str(e):
+                logger.info(f"[image] Not modified for user {user_id}")
+            else:
+                logger.warning(f"Failed to edit image for user {user_id}: {e}")
+    else:
+        logger.info(f"[image] Skipped update for user {user_id} (same)")
+
+    if info.text != prev_text or keyboard_str != prev_keyboard:
+        try:
+            await bot.edit_message_text(
+                chat_id=user_id,
+                message_id=text_msg_id,
+                text=info.text,
+                reply_markup=keyboard
+            )
+            logger.info(f"[text] Updated for user {user_id}")
+        except TelegramBadRequest as e:
+            if "message is not modified" in str(e):
+                logger.info(f"[text] Not modified for user {user_id}")
+            else:
+                logger.warning(f"Failed to edit text for user {user_id}: {e}")
+    else:
+        logger.info(f"[text] Skipped update for user {user_id} (same)")
+
+    await save_feedback_state(user_id,
+        last_text=info.text,
+        last_image=info.image,
+        last_keyboard=keyboard_str
+    )
 
 
 async def callback_handler(callback: CallbackQuery):
@@ -68,7 +109,11 @@ async def callback_handler(callback: CallbackQuery):
         return
 
     if data == "back_to_main":
-        info = CATEGORIES["Другое"]
+        full_name = callback.from_user.full_name or "друг"
+        info = CategoryInfo(
+            image=START_INFO.image,
+            text=START_INFO.text.format(full_name=full_name)
+        )
         state = await redis_client.hgetall(f"user_state:{user_id}")
         image_msg_id = int(state.get("image_message_id", 0))
         text_msg_id = int(state.get("menu_message_id", 0))
