@@ -7,16 +7,22 @@ from src.utils.categories import START_INFO
 logger = setup_logger(__name__)
 
 async def start_handler(message: Message):
-    logger.info(f"/start received from user {message.from_user.id}")
-    
-    caption = START_INFO.text.format(full_name=message.from_user.full_name)
+    user_id = message.from_user.id
+    logger.info(f"/start received from user {user_id}")
+
     photo = FSInputFile(START_INFO.image)
-    
-    sent = await message.answer_photo(
-        photo=photo,
-        caption=caption,
-        reply_markup=get_main_keyboard()
+    caption_text = START_INFO.text.format(full_name=message.from_user.full_name)
+
+    # Отправляем фото (без подписи)
+    photo_msg = await message.answer_photo(photo=photo)
+
+    # Отправляем текст с кнопками
+    text_msg = await message.answer(caption_text, reply_markup=get_main_keyboard())
+
+    # Сохраняем оба message_id
+    await save_feedback_state(user_id,
+        image_message_id=photo_msg.message_id,
+        menu_message_id=text_msg.message_id
     )
-    
-    await save_feedback_state(message.from_user.id, menu_message_id=sent.message_id)
-    logger.info(f"Sent start photo message id={sent.message_id} to user {message.from_user.id}")
+
+    logger.info(f"Sent start photo (id={photo_msg.message_id}) and text (id={text_msg.message_id}) to user {user_id}")
