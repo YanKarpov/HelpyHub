@@ -1,6 +1,6 @@
 from aiogram.types import Message, FSInputFile
 from src.keyboard import get_main_keyboard
-from src.utils.media_utils import save_feedback_state
+from src.utils.media_utils import save_state 
 from src.utils.logger import setup_logger
 from src.utils.categories import START_INFO  
 
@@ -13,14 +13,12 @@ async def start_handler(message: Message):
     photo = FSInputFile(START_INFO.image)
     caption_text = START_INFO.text.format(full_name=message.from_user.full_name)
 
-    # Отправляем фото (без подписи)
     photo_msg = await message.answer_photo(photo=photo)
 
-    # Отправляем текст с кнопками
     text_msg = await message.answer(caption_text, reply_markup=get_main_keyboard())
 
-    # Сохраняем оба message_id
-    await save_feedback_state(user_id,
+    await save_state(
+        user_id,
         image_message_id=photo_msg.message_id,
         menu_message_id=text_msg.message_id
     )

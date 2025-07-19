@@ -6,22 +6,38 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-async def save_feedback_state(user_id: int, **kwargs):
-    key = f"user_state:{user_id}"
+async def save_state(user_id: int, key_prefix: str = "user_state", **kwargs):
+    for k, v in kwargs.items():
+        logger.debug(f"Saving {k} = {v} for user {user_id} under {key_prefix}")
+    key = f"{key_prefix}:{user_id}"
     str_mapping = {k: str(v) for k, v in kwargs.items()}
     await redis_client.hset(key, mapping=str_mapping)
     await redis_client.expire(key, 3600)
-    state = await redis_client.hgetall(key)
-    logger.info(f"Feedback state updated for user {user_id}: {state}")
 
 
 async def send_or_edit_media(message_or_cb, photo_path, text, reply_markup):
+    logger.warning(f"[DEBUG] send_or_edit_media: from_user.id={message_or_cb.from_user.id}, is_bot={message_or_cb.from_user.is_bot}")
+    logger.warning(f"[DEBUG] send_or_edit_media: type={type(message_or_cb)}")
+
     user_id = message_or_cb.from_user.id
     bot = message_or_cb.bot
+
+    # Защита от попытки отправить сообщение другому боту
+    if message_or_cb.from_user.is_bot:
+        logger.warning(f"Attempt to send message to bot user_id={user_id}, aborting")
+        raise ValueError("Cannot send message to bot user")
 
     state = await redis_client.hgetall(f"user_state:{user_id}")
     image_msg_id = int(state.get("image_message_id", 0))
     text_msg_id = int(state.get("menu_message_id", 0))
+
+    # Проверяем, что message_id выглядят адекватно (Telegram message_id обычно не превышает нескольких сотен тысяч)
+    if image_msg_id > 1000000 or text_msg_id > 1000000:
+        logger.warning(
+            f"Suspicious message IDs for user {user_id}: "
+            f"image_msg_id={image_msg_id}, text_msg_id={text_msg_id}. Resetting IDs."
+        )
+        image_msg_id, text_msg_id = 0, 0  # сбрасываем, чтобы отправить новые сообщения
 
     try:
         if image_msg_id and text_msg_id:
@@ -70,4 +86,5 @@ async def send_or_edit_media(message_or_cb, photo_path, text, reply_markup):
             reply_markup=reply_markup
         )
 
-        await save_feedback_state(user_id, image_message_id=image_msg.message_id, menu_message_id=text_msg.message_id)
+        await save_state(user_id, image_message_id=image_msg.message_id, menu_message_id=text_msg.message_id)
+

@@ -3,23 +3,22 @@ from aiogram.types.input_file import FSInputFile
 from aiogram.exceptions import TelegramBadRequest  
 import json
 
-
 from src.keyboard import (
     get_main_keyboard,
     get_submenu_keyboard,
     get_identity_choice_keyboard
 )
-from src.utils.media_utils import save_feedback_state, send_or_edit_media
+from src.utils.media_utils import save_state, send_or_edit_media  
 from src.utils.logger import setup_logger
 from src.services.redis_client import redis_client, can_create_new_feedback
 from src.utils.categories import CategoryInfo, CATEGORIES, CATEGORIES_LIST, START_INFO
 
-logger = setup_logger(__name__)
+from src.handlers.feedback import send_feedback_prompt  
 
+logger = setup_logger(__name__)
 
 def safe_decode(value):
     return value.decode("utf-8") if isinstance(value, bytes) else value
-
 
 async def update_category_messages(bot, user_id, image_msg_id, text_msg_id, info, disabled_category):
     state = await redis_client.hgetall(f"user_state:{user_id}")
@@ -32,13 +31,6 @@ async def update_category_messages(bot, user_id, image_msg_id, text_msg_id, info
     else:
         keyboard = get_main_keyboard(disabled_category)
     keyboard_str = json.dumps(keyboard.model_dump())
-
-    logger.info(f"[text] old: {repr(prev_text)}")
-    logger.info(f"[text] new: {repr(info.text)}")
-    logger.info(f"[keyboard] old: {repr(prev_keyboard)}")
-    logger.info(f"[keyboard] new: {repr(keyboard_str)}")
-    logger.info(f"[image] old: {repr(prev_image)}")
-    logger.info(f"[image] new: {repr(info.image)}")
 
     if info.image != prev_image:
         try:
@@ -73,16 +65,21 @@ async def update_category_messages(bot, user_id, image_msg_id, text_msg_id, info
     else:
         logger.info(f"[text] Skipped update for user {user_id} (same)")
 
-    await save_feedback_state(user_id,
+    await save_state(user_id,
         last_text=info.text,
         last_image=info.image,
         last_keyboard=keyboard_str
     )
 
-
 async def callback_handler(callback: CallbackQuery):
+    user = callback.from_user
+    if user.is_bot:
+        logger.warning(f"Ignoring callback from bot {user.id}")
+        await callback.answer("Боты не могут использовать этого бота", show_alert=True)
+        return
+    
     data = callback.data
-    user_id = callback.from_user.id
+    user_id = user.id
     bot = callback.message.bot
     logger.info(f"Callback received from user {user_id} with data: {data}")
 
@@ -93,7 +90,7 @@ async def callback_handler(callback: CallbackQuery):
         if text_id:
             mapping["menu_message_id"] = text_id
         if mapping:
-            await save_feedback_state(user_id, **mapping)
+            await save_state(user_id, **mapping)
             logger.info(f"Saved message IDs for user {user_id}: {mapping}")
 
     if data.startswith("reply_to_user:"):
@@ -138,12 +135,12 @@ async def callback_handler(callback: CallbackQuery):
         await redis_client.set(f"feedback_type:{user_id}", data, ex=300)
 
         msg = await send_or_edit_media(
-            callback.message,
+            callback,
             CATEGORIES.get(data, CATEGORIES["Другое"]).image,
-            "Хочешь остаться анонимом или указать своё имя?",
+            "Хочешь остаться анонимом или указать своё?",
             get_identity_choice_keyboard()
         )
-        await save_feedback_state(user_id, menu_message_id=msg.message_id)
+        await save_state(user_id, menu_message_id=msg.message_id)
         await callback.answer()
         return
 
@@ -155,46 +152,10 @@ async def callback_handler(callback: CallbackQuery):
 
         decoded_type = safe_decode(feedback_type)
         is_named = data == "send_named"
-        await save_feedback_state(user_id, type=decoded_type, is_named=is_named)
+        await save_state(user_id, type=decoded_type, is_named=is_named)
 
-        info = CATEGORIES.get(decoded_type, CATEGORIES["Другое"])
-        state = await redis_client.hgetall(f"user_state:{user_id}")
-        image_msg_id = int(state.get("image_message_id", 0))
-        text_msg_id = int(state.get("menu_message_id", 0))
+        await send_feedback_prompt(bot, user_id, decoded_type, is_named)
 
-        if image_msg_id and text_msg_id:
-            try:
-                await bot.edit_message_media(
-                    chat_id=user_id,
-                    message_id=image_msg_id,
-                    media=InputMediaPhoto(media=FSInputFile(info.image))
-                )
-            except Exception as e:
-                logger.warning(f"Failed to edit feedback image for user {user_id}: {e}")
-
-            try:
-                await bot.edit_message_text(
-                    chat_id=user_id,
-                    message_id=text_msg_id,
-                    text=f"Опиши проблему по теме '{decoded_type}':",
-                    reply_markup=None
-                )
-                await save_feedback_state(user_id, prompt_message_id=text_msg_id)
-            except Exception as e:
-                logger.warning(f"Failed to edit feedback text for user {user_id}: {e}")
-        else:
-            image_msg = await bot.send_photo(
-                chat_id=user_id,
-                photo=FSInputFile(info.image)
-            )
-            text_msg = await bot.send_message(
-                chat_id=user_id,
-                text=f"Опиши проблему по теме '{decoded_type}':"
-            )
-            await save_menu_ids(image_msg.message_id, text_msg.message_id)
-            await save_feedback_state(user_id, prompt_message_id=text_msg.message_id)
-
-        logger.info(f"Feedback prompt sent to user {user_id} (named={is_named}) for type {decoded_type}")
         await callback.answer()
         return
 

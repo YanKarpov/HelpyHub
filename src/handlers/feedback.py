@@ -9,28 +9,72 @@ from src.utils.categories import (
     FEEDBACK_NOTIFICATION_TEMPLATE,
     ACKNOWLEDGMENT_CAPTION,
     ACKNOWLEDGMENT_IMAGE_PATH,
+    CATEGORIES,
 )
+from src.utils.media_utils import save_state  
 
 logger = setup_logger(__name__)
 
+
+async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
+    info = CATEGORIES.get(feedback_type, CATEGORIES["Другое"])
+    state = await redis_client.hgetall(f"user_state:{user_id}")
+    image_msg_id = int(state.get("image_message_id", 0))
+    text_msg_id = int(state.get("menu_message_id", 0))
+
+    if image_msg_id and text_msg_id:
+        try:
+            await bot.edit_message_media(
+                chat_id=user_id,
+                message_id=image_msg_id,
+                media=InputMediaPhoto(media=FSInputFile(info.image))
+            )
+        except Exception as e:
+            logger.warning(f"Failed to edit feedback image for user {user_id}: {e}")
+
+        try:
+            await bot.edit_message_text(
+                chat_id=user_id,
+                message_id=text_msg_id,
+                text=f"Опиши проблему по теме '{feedback_type}':",
+                reply_markup=None
+            )
+            await save_state(user_id, prompt_message_id=text_msg_id)
+        except Exception as e:
+            logger.warning(f"Failed to edit feedback text for user {user_id}: {e}")
+    else:
+        image_msg = await bot.send_photo(
+            chat_id=user_id,
+            photo=FSInputFile(info.image)
+        )
+        text_msg = await bot.send_message(
+            chat_id=user_id,
+            text=f"Опиши проблему по теме '{feedback_type}':"
+        )
+        # Сохраняем оба id и prompt_message_id одним вызовом
+        await save_state(user_id,
+                         image_message_id=image_msg.message_id,
+                         menu_message_id=text_msg.message_id,
+                         prompt_message_id=text_msg.message_id)
+
+    logger.info(f"Feedback prompt sent to user {user_id} (named={is_named}) for type {feedback_type}")
+
+
 async def feedback_message_handler(message: Message):
     user_id = message.from_user.id
-    feedback_key = f"feedback_state:{user_id}"
+    feedback_key = f"user_state:{user_id}"  # обновлённый ключ prefix!
 
     feedback = await redis_client.hgetall(feedback_key)
     if not feedback:
         logger.info(f"User {user_id} sent a message, but feedback not expected. Ignoring.")
-        return  
+        return
 
-    # Проверяем, есть ли уже открытое обращение (блокировка)
     if not await can_create_new_feedback(user_id):
         await message.answer("❗️ У вас уже есть открытое обращение. Пожалуйста, дождитесь ответа на предыдущее перед созданием нового.")
         return
 
-    # Ставим блокировку на создание нового обращения
     await lock_feedback(user_id)
 
-    # Декодер значений из Redis
     def decode(value):
         return value.decode('utf-8') if isinstance(value, bytes) else value
 
@@ -49,7 +93,6 @@ async def feedback_message_handler(message: Message):
         message_text=message.text,
     )
 
-    # Отправляем в группу поддержки
     try:
         await message.bot.send_message(
             chat_id=GROUP_CHAT_ID,
@@ -60,7 +103,6 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.error(f"Failed to send message to support group: {e}")
 
-    # Сохраняем в Google Sheets
     try:
         await asyncio.get_event_loop().run_in_executor(
             None,
@@ -79,20 +121,17 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.error(f"Failed to save feedback to Google Sheets: {e}")
 
-    # Удаляем сохранённое состояние
     try:
         await redis_client.delete(feedback_key)
     except Exception as e:
         logger.warning(f"Failed to delete feedback key from Redis: {e}")
 
-    # Удаляем промпт-сообщение
     if prompt_message_id:
         try:
             await message.bot.delete_message(chat_id=message.chat.id, message_id=int(prompt_message_id))
         except Exception as e:
             logger.warning(f"Failed to delete prompt message: {e}")
 
-    # Удаляем сообщение пользователя
     try:
         await message.delete()
     except Exception as e:
