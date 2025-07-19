@@ -131,14 +131,17 @@ async def feedback_message_handler(message: Message):
     feedback_key = f"user_state:{user_id}"
 
     feedback = await get_user_state(user_id)
-    if not feedback:
-        logger.info(f"User {user_id} sent a message, but feedback not expected. Ignoring.")
+
+    # ✅ Проверка: только если пользователь уже дошёл до этапа ввода фидбэка
+    if not feedback or not feedback.get("prompt_message_id"):
+        logger.info(f"User {user_id} sent a message, but feedback prompt not expected. Ignoring.")
         return
 
     if not await can_create_new_feedback(user_id):
         await message.answer("❗️ У вас уже есть открытое обращение. Пожалуйста, дождитесь ответа на предыдущее перед созданием нового.")
         return
 
+    # Проверка на нецензурную лексику
     try:
         ProfanityFilter().check_and_raise(message.text)
     except ValueError as e:
