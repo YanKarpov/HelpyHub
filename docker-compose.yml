@@ -10,5 +10,22 @@ services:
     volumes:
       - redis_data:/data
 
+  tg-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tg-helper-bot
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: ["python", "main.py"]
+
 volumes:
   redis_data:

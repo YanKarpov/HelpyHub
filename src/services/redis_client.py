@@ -1,10 +1,14 @@
+import os
 import redis.asyncio as redis
 
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+
 redis_client = redis.Redis(
-    host='localhost',    # адрес Redis-сервера
-    port=6379,           # порт Redis (по умолчанию 6379)
-    db=0,                # номер базы Redis
-    decode_responses=True  # чтобы получать строки, а не байты
+    host=REDIS_HOST,    
+    port=REDIS_PORT,
+    db=0,
+    decode_responses=True
 )
 
 FEEDBACK_LOCK_KEY = "feedback_lock:{user_id}"
