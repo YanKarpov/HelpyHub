@@ -3,8 +3,8 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 
 from src.utils.config import BOT_TOKEN
-from src.handlers.start import start_handler
-from src.handlers.callback import callback_handler
+from src.handlers.start_handler import start_handler
+from src.handlers.callback_handler import callback_handler
 from src.handlers.feedback import feedback_message_handler
 from src.handlers.admin_reply import admin_reply_text_handler  
 from src.services.redis_client import redis_client

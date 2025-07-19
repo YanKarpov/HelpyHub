@@ -1,10 +1,23 @@
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 from src.services.redis_client import redis_client, unlock_feedback
 from src.utils.logger import setup_logger
 from src.services.google_sheets import update_feedback_in_sheet
 import asyncio
 
 logger = setup_logger(__name__)
+
+async def handle_admin_reply(callback: CallbackQuery, data: str):
+    user_id = callback.from_user.id
+    try:
+        target_user_id = int(data.split(":", 1)[1])
+        await redis_client.set(f"admin_replying:{user_id}", target_user_id, ex=1800)
+        new_text = callback.message.text + "\n\nНапишите ответ для пользователя и я его отправлю"
+        await callback.message.edit_text(new_text)
+        logger.info(f"Admin {user_id} replying to user {target_user_id}")
+    except ValueError:
+        logger.error(f"Invalid user ID in reply_to_user: {data}")
+        await callback.answer("Некорректный ID", show_alert=True)
+
 
 async def admin_reply_text_handler(message: Message):
     admin_id = message.from_user.id
@@ -35,7 +48,6 @@ async def admin_reply_text_handler(message: Message):
         )
 
         await unlock_feedback(int(user_id))
-
         await redis_client.delete(f"admin_replying:{admin_id}")
 
     except Exception as e:

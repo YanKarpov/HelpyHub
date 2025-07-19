@@ -40,6 +40,30 @@ CATEGORIES = {
     )
 }
 
+SUBCATEGORIES = {
+    "Обратная связь": CategoryInfo(
+        image="assets/images/feedback.jpg",
+        text=(
+            "Здесь ты можешь оставить обратную связь касаемо работы или задать интересующие тебя вопросы:"
+        )
+    ),
+    "Проблемы с техникой": CategoryInfo(
+        image="assets/images/tech_issues.jpg",
+        text=(
+            "Если ты столкнулся с какой-то технической проблемой — подробно опиши ее в формате:\n"
+            "1. Название и номер устройства\n"
+            "2. Описание проблемы"
+        )
+    ),
+    "Срочная помощь": CategoryInfo(
+        image="assets/images/other_sub.jpg",
+        text=(
+            "Данная кнопка предназначена для того чтобы ты мог анонимно рассказать о чрезвычайных ситуациях, с которыми ты столкнулся."
+        )
+    ),
+}
+
+
 START_INFO = CategoryInfo(
     image="assets/images/welcome.jpg",
     text=(
