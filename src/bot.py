@@ -18,12 +18,12 @@ logger = setup_logger(__name__)
 storage = RedisStorage(redis=redis_client)
 
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(storage=storage)
+dp = Dispatcher(bot=bot, storage=storage) 
 
 class IsAdminReplying(Filter):
     async def __call__(self, message: Message) -> bool:
         result = await redis_client.exists(f"admin_replying:{message.from_user.id}")
-        logger.info(f"IsAdminReplying filter: user_id={message.from_user.id} result={bool(result)}")
+        logger.debug(f"IsAdminReplying filter: user_id={message.from_user.id} result={bool(result)}")
         return bool(result)
 
 def register_handlers(dp: Dispatcher):
