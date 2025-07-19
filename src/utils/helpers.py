@@ -1,4 +1,4 @@
-from src.services.redis_client import redis_client
+from src.services.redis_client import redis_client,  USER_STATE_KEY
 from src.utils.media_utils import save_state
 from aiogram.types import CallbackQuery
 
@@ -6,7 +6,8 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 async def get_user_state(user_id: int) -> dict:
-    return await redis_client.hgetall(f"user_state:{user_id}")
+    key = USER_STATE_KEY.format(user_id=user_id)
+    return await redis_client.hgetall(key)
 
 def safe_decode(value):
     return value.decode("utf-8") if isinstance(value, bytes) else value

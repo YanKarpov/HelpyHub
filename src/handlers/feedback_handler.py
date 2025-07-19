@@ -7,22 +7,19 @@ from src.services.redis_client import redis_client, can_create_new_feedback, loc
 from src.services.google_sheets import append_feedback_to_sheet
 from src.utils.categories import (
     FEEDBACK_NOTIFICATION_TEMPLATE,
+    URGENT_FEEDBACK_NOTIFICATION_TEMPLATE,  
     ACKNOWLEDGMENT_CAPTION,
     ACKNOWLEDGMENT_IMAGE_PATH,
     CATEGORIES,
     SUBCATEGORIES
 )
 from src.utils.media_utils import save_state  
-
 from src.utils.media_utils import send_or_edit_media, save_state
 from src.keyboard import get_identity_choice_keyboard
 from aiogram.types import CallbackQuery
-
 from src.utils.helpers import safe_decode, save_state
 
-
 logger = setup_logger(__name__)
-
 
 
 async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
@@ -44,7 +41,10 @@ async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
     image_msg_id = int(state.get("image_message_id", 0))
     text_msg_id = int(state.get("menu_message_id", 0))
 
+    logger.info(f"Current saved state for user {user_id}: image_msg_id={image_msg_id}, text_msg_id={text_msg_id}")
+
     if image_msg_id and text_msg_id:
+        logger.info(f"Editing existing messages for user {user_id}: image_msg_id={image_msg_id}, text_msg_id={text_msg_id}")
         try:
             await bot.edit_message_media(
                 chat_id=user_id,
@@ -69,10 +69,14 @@ async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
             chat_id=user_id,
             photo=FSInputFile(info.image)
         )
+        logger.info(f"Sent new image message to user {user_id}: message_id={image_msg.message_id}")
+
         text_msg = await bot.send_message(
             chat_id=user_id,
             text=message_text
         )
+        logger.info(f"Sent new text message to user {user_id}: message_id={text_msg.message_id}")
+
         await save_state(
             user_id,
             image_message_id=image_msg.message_id,
@@ -81,6 +85,7 @@ async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
         )
 
     logger.info(f"Feedback prompt sent to user {user_id} (named={is_named}) for type {feedback_type}")
+
 
 async def handle_feedback_choice(callback: CallbackQuery, data: str):
     user_id = callback.from_user.id
@@ -144,16 +149,26 @@ async def feedback_message_handler(message: Message):
     is_named = decode(feedback.get('is_named', 'False')) == 'True'
     prompt_message_id = decode(feedback.get('prompt_message_id')) if feedback.get('prompt_message_id') else None
     menu_message_id = decode(feedback.get('menu_message_id')) if feedback.get('menu_message_id') else None
+    image_message_id = decode(feedback.get('image_message_id')) if feedback.get('image_message_id') else None
+
+    logger.info(f"Feedback state for user {user_id}: prompt_message_id={prompt_message_id}, menu_message_id={menu_message_id}, image_message_id={image_message_id}")
 
     username = message.from_user.username or ""
     full_name = message.from_user.full_name
     sender_display_name = f"@{username}" if (is_named and username) else (full_name if is_named else "Анонимус")
 
-    text = FEEDBACK_NOTIFICATION_TEMPLATE.format(
-        sender_display_name=sender_display_name,
-        category=category,
-        message_text=message.text,
-    )
+    # Используем разные шаблоны в зависимости от категории
+    if category == "Срочная помощь":
+        text = URGENT_FEEDBACK_NOTIFICATION_TEMPLATE.format(
+            sender_display_name=sender_display_name,
+            message_text=message.text,
+        )
+    else:
+        text = FEEDBACK_NOTIFICATION_TEMPLATE.format(
+            sender_display_name=sender_display_name,
+            category=category,
+            message_text=message.text,
+        )
 
     try:
         await message.bot.send_message(
@@ -188,11 +203,29 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.warning(f"Failed to delete feedback key from Redis: {e}")
 
+    # Удаляем prompt_message_id
     if prompt_message_id:
+        logger.info(f"Deleting prompt message for user {user_id}: message_id={prompt_message_id}")
         try:
             await message.bot.delete_message(chat_id=user_id, message_id=int(prompt_message_id))
         except Exception as e:
             logger.warning(f"Failed to delete prompt message: {e}")
+
+    # Удаляем menu_message_id, если он отличается от prompt_message_id
+    if menu_message_id and menu_message_id != prompt_message_id:
+        logger.info(f"Trying to delete old menu message: chat_id={user_id}, message_id={menu_message_id}")
+        try:
+            await message.bot.delete_message(chat_id=user_id, message_id=int(menu_message_id))
+        except Exception as e:
+            logger.warning(f"Failed to delete old menu message: {e}")
+
+    # Удаляем image_message_id, если он не совпадает с другими
+    if image_message_id and image_message_id not in [prompt_message_id, menu_message_id]:
+        logger.info(f"Trying to delete image message: chat_id={user_id}, message_id={image_message_id}")
+        try:
+            await message.bot.delete_message(chat_id=user_id, message_id=int(image_message_id))
+        except Exception as e:
+            logger.warning(f"Failed to delete image message: {e}")
 
     try:
         await message.delete()
@@ -205,11 +238,10 @@ async def feedback_message_handler(message: Message):
         inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main")]]
     )
 
-    if menu_message_id:
-        logger.info(f"Trying to delete old menu message: chat_id={user_id}, message_id={menu_message_id}")
-        try:
-            await message.bot.delete_message(chat_id=user_id, message_id=int(menu_message_id))
-        except Exception as e:
-            logger.warning(f"Failed to delete old menu message: {e}")
+    ack_message = await message.answer_photo(photo=ack_photo, caption=ack_caption, reply_markup=back_btn)
 
-    await message.answer_photo(photo=ack_photo, caption=ack_caption, reply_markup=back_btn)
+    await save_state(
+        user_id,
+        menu_message_id=ack_message.message_id,
+        image_message_id=0  
+    )

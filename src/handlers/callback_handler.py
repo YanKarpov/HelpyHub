@@ -1,11 +1,11 @@
 from aiogram.types import CallbackQuery
 import logging
 
-from src.handlers.feedback import (
+from src.handlers.feedback_handler import (
     handle_feedback_choice,      
     handle_send_identity_choice   
 )
-from src.handlers.admin_reply import handle_admin_reply  
+from src.handlers.admin_handler import handle_admin_reply  
 from src.services.message_service import (
     handle_category_selection,
     handle_category_other,
@@ -36,9 +36,10 @@ async def callback_handler(callback: CallbackQuery):
         logger.info(f"User {user_id} pressed ignore")
         return
 
-    if data in ["Проблемы с техникой", "Обратная связь"]:
+    if data in ["Проблемы с техникой", "Обратная связь", "Срочная помощь"]:
         await handle_feedback_choice(callback, data)
         return
+
 
     if data in ["send_anonymous", "send_named"]:
         await handle_send_identity_choice(callback, data)

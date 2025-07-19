@@ -56,7 +56,7 @@ SUBCATEGORIES = {
         )
     ),
     "Срочная помощь": CategoryInfo(
-        image="assets/images/other_sub.jpg",
+        image="assets/images/redbutton.jpg",
         text=(
             "Данная кнопка предназначена для того чтобы ты мог анонимно рассказать о чрезвычайных ситуациях, с которыми ты столкнулся."
         )
@@ -76,6 +76,13 @@ START_INFO = CategoryInfo(
 FEEDBACK_NOTIFICATION_TEMPLATE = (
     "Новое обращение от {sender_display_name}:\n"
     "Категория: {category}\n\n"
+    "{message_text}"
+)
+
+URGENT_FEEDBACK_NOTIFICATION_TEMPLATE = (
+    "🚨 *АХТУНГ!* 🚨\n"
+    "Пользователь: {sender_display_name}\n\n"
+    "Сообщение:\n"
     "{message_text}"
 )
 
