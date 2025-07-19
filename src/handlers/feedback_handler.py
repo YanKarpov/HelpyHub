@@ -7,7 +7,7 @@ from src.services.redis_client import redis_client, can_create_new_feedback, loc
 from src.services.google_sheets import append_feedback_to_sheet
 from src.utils.categories import (
     FEEDBACK_NOTIFICATION_TEMPLATE,
-    URGENT_FEEDBACK_NOTIFICATION_TEMPLATE,  
+    URGENT_FEEDBACK_NOTIFICATION_TEMPLATE,
     ACKNOWLEDGMENT_CAPTION,
     ACKNOWLEDGMENT_IMAGE_PATH,
     CATEGORIES,
@@ -21,7 +21,6 @@ logger = setup_logger(__name__)
 
 
 async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
-    # Определяем текст и изображение
     if feedback_type in SUBCATEGORIES:
         info = SUBCATEGORIES[feedback_type]
         message_text = info.text
@@ -56,7 +55,6 @@ async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
                 text=message_text,
                 reply_markup=None
             )
-            # Обновляем prompt_message_id, т.к. это сообщение сейчас активное
             await save_state(user_id, prompt_message_id=text_msg_id)
         except Exception as e:
             logger.warning(f"Failed to edit feedback text for user {user_id}: {e}")
@@ -92,7 +90,7 @@ async def handle_feedback_choice(callback: CallbackQuery, data: str):
     msg = await send_or_edit_media(
         callback,
         CATEGORIES.get(data, CATEGORIES["Другое"]).image,
-        photo_caption="",  
+        photo_caption="",
         text="Хочешь остаться анонимом или указать своё?",
         reply_markup=get_identity_choice_keyboard()
     )
@@ -114,13 +112,21 @@ async def handle_send_identity_choice(callback: CallbackQuery, data: str):
 
     decoded_type = safe_str(feedback_type)
     is_named = data == "send_named"
+
     await save_state(user_id, type=decoded_type, is_named=is_named)
+
+    # 🔐 Блокируем возможность повторного обращения до ответа
+    await lock_feedback(user_id)
 
     await send_feedback_prompt(bot, user_id, decoded_type, is_named)
     await callback.answer()
 
 
 async def feedback_message_handler(message: Message):
+    if message.chat.type != "private":
+        logger.debug(f"Ignoring message from chat_id={message.chat.id}, type={message.chat.type}")
+        return
+
     user_id = message.from_user.id
     feedback_key = f"user_state:{user_id}"
 
@@ -133,16 +139,15 @@ async def feedback_message_handler(message: Message):
         await message.answer("❗️ У вас уже есть открытое обращение. Пожалуйста, дождитесь ответа на предыдущее перед созданием нового.")
         return
 
-    # Проверяем сообщение на мат
     try:
         ProfanityFilter().check_and_raise(message.text)
     except ValueError as e:
         await message.answer(str(e))
         return
 
+    # Уже заблокировано ранее, но повторная блокировка безопасна
     await lock_feedback(user_id)
 
-    # Используем safe_str для всех значений
     category = safe_str(feedback.get('type', 'Не указана'))
     is_named = safe_str(feedback.get('is_named', 'False')) == 'True'
     prompt_message_id = safe_str(feedback.get('prompt_message_id')) or None
@@ -185,9 +190,7 @@ async def feedback_message_handler(message: Message):
             sender_display_name,
             category,
             message.text,
-            "",  # answer_text
-            "",  # admin_id
-            "",  # admin_username
+            "", "", "",  # answer_text, admin_id, admin_username
             "Ожидает ответа",
             is_named
         )
@@ -200,7 +203,6 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.warning(f"Failed to delete feedback key from Redis: {e}")
 
-    # Удаляем сообщения по id, если они есть
     for msg_id in {prompt_message_id, menu_message_id, image_message_id}:
         if msg_id and msg_id.isdigit():
             try:
@@ -221,5 +223,4 @@ async def feedback_message_handler(message: Message):
 
     ack_message = await message.answer_photo(photo=ack_photo, caption=ACKNOWLEDGMENT_CAPTION, reply_markup=back_btn)
 
-    # Сохраняем новое состояние
     await save_menu_message_ids(user_id, image_id=ack_message.message_id, text_id=ack_message.message_id)

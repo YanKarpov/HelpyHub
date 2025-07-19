@@ -6,6 +6,8 @@ services:
     container_name: redis-bot
     ports:
       - "6379:6379"
+    environment:
+      - TZ=Europe/Moscow
     restart: unless-stopped
     volumes:
       - redis_data:/data
@@ -19,6 +21,7 @@ services:
     depends_on:
       - redis
     environment:
+      - TZ=Europe/Moscow
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - PYTHONUNBUFFERED=1
