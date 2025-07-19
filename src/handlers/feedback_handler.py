@@ -15,6 +15,7 @@ from src.utils.categories import (
 )
 from src.utils.media_utils import save_state, send_or_edit_media
 from src.utils.helpers import safe_str, get_user_state, save_menu_message_ids, handle_bot_user
+from filter_profanity import ProfanityFilter
 
 logger = setup_logger(__name__)
 
@@ -130,6 +131,13 @@ async def feedback_message_handler(message: Message):
 
     if not await can_create_new_feedback(user_id):
         await message.answer("❗️ У вас уже есть открытое обращение. Пожалуйста, дождитесь ответа на предыдущее перед созданием нового.")
+        return
+
+    # Проверяем сообщение на мат
+    try:
+        ProfanityFilter().check_and_raise(message.text)
+    except ValueError as e:
+        await message.answer(str(e))
         return
 
     await lock_feedback(user_id)
