@@ -1,11 +1,14 @@
 import asyncio
-from aiogram.types import Message, FSInputFile, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.types import (
+    Message, FSInputFile, InputMediaPhoto,
+    InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+)
+
 from src.keyboards.identity import get_identity_choice_keyboard
 from src.keyboards.reply import get_reply_to_user_keyboard
 from src.utils.config import GROUP_CHAT_ID
 from src.utils.logger import setup_logger
-from src.services.redis_client import redis_client, can_create_new_feedback, lock_feedback
-from src.services.google_sheets import append_feedback_to_sheet
+from src.services.state_manager import StateManager
 from src.utils.categories import (
     FEEDBACK_NOTIFICATION_TEMPLATE,
     URGENT_FEEDBACK_NOTIFICATION_TEMPLATE,
@@ -14,14 +17,17 @@ from src.utils.categories import (
     CATEGORIES,
     SUBCATEGORIES
 )
-from src.utils.media_utils import save_state, send_or_edit_media
-from src.utils.helpers import safe_str, get_user_state, save_menu_message_ids, handle_bot_user
+from src.utils.media_utils import send_or_edit_media
+from src.utils.helpers import safe_str, handle_bot_user
 from src.utils.filter_profanity import ProfanityFilter
+from src.services.google_sheets import append_feedback_to_sheet
 
 logger = setup_logger(__name__)
 
 
 async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
+    state_mgr = StateManager(user_id)
+
     if feedback_type in SUBCATEGORIES:
         info = SUBCATEGORIES[feedback_type]
         message_text = info.text
@@ -32,7 +38,7 @@ async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
         info = CATEGORIES["Другое"]
         message_text = info.text
 
-    state = await get_user_state(user_id)
+    state = await state_mgr.get_state()
     image_msg_id = int(safe_str(state.get("image_message_id", 0)))
     text_msg_id = int(safe_str(state.get("menu_message_id", 0)))
 
@@ -56,15 +62,14 @@ async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
                 text=message_text,
                 reply_markup=None
             )
-            await save_state(user_id, prompt_message_id=text_msg_id)
+            await state_mgr.save_state(prompt_message_id=text_msg_id)
         except Exception as e:
             logger.warning(f"Failed to edit feedback text for user {user_id}: {e}")
     else:
         image_msg = await bot.send_photo(chat_id=user_id, photo=FSInputFile(info.image))
         text_msg = await bot.send_message(chat_id=user_id, text=message_text)
 
-        await save_state(
-            user_id,
+        await state_mgr.save_state(
             image_message_id=image_msg.message_id,
             menu_message_id=text_msg.message_id,
             prompt_message_id=text_msg.message_id
@@ -72,27 +77,28 @@ async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
 
     logger.info(f"Feedback prompt sent to user {user_id} (named={is_named}) for type {feedback_type}")
 
+
 async def handle_feedback_choice(callback: CallbackQuery, data: str):
     if await handle_bot_user(callback):
         return
 
     user_id = callback.from_user.id
+    state_mgr = StateManager(user_id)
 
-    is_blocked = await redis_client.exists(f"blocked:{user_id}")
-    if is_blocked:
+    if await state_mgr.is_blocked():
         await callback.answer("❌ Вы заблокированы и не можете оставлять обращения.", show_alert=True)
         logger.info(f"Blocked user {user_id} попытался выбрать категорию.")
         return
 
-    if not await can_create_new_feedback(user_id):
+    if not await state_mgr.can_create_new():
         await callback.answer(
             "❗️ У вас уже есть открытое обращение. Дождитесь ответа перед созданием нового. ❗️",
             show_alert=True
         )
-        logger.info(f"User {user_id} attempted to start new feedback while blocked")
+        logger.info(f"User {user_id} attempted to start new feedback while locked")
         return
 
-    await redis_client.set(f"feedback_type:{user_id}", data, ex=300)
+    await state_mgr.set_feedback_type(data, expire=300)
 
     msg = await send_or_edit_media(
         callback,
@@ -101,8 +107,14 @@ async def handle_feedback_choice(callback: CallbackQuery, data: str):
         text="Хочешь остаться анонимом или указать своё?",
         reply_markup=get_identity_choice_keyboard()
     )
-    await save_state(user_id, menu_message_id=msg.message_id)
+
+    if msg:
+        await state_mgr.save_state(menu_message_id=msg.message_id)
+    else:
+        logger.warning(f"msg is None — не сохраняю message_id для user_id={callback.from_user.id}")
+
     await callback.answer()
+
 
 async def handle_send_identity_choice(callback: CallbackQuery, data: str):
     if await handle_bot_user(callback):
@@ -110,8 +122,9 @@ async def handle_send_identity_choice(callback: CallbackQuery, data: str):
 
     user_id = callback.from_user.id
     bot = callback.message.bot
+    state_mgr = StateManager(user_id)
 
-    feedback_type = await redis_client.get(f"feedback_type:{user_id}")
+    feedback_type = await state_mgr.get_feedback_type()
     if not feedback_type:
         await callback.answer("Что-то пошло не так. Попробуй ещё раз.", show_alert=True)
         return
@@ -119,10 +132,7 @@ async def handle_send_identity_choice(callback: CallbackQuery, data: str):
     decoded_type = safe_str(feedback_type)
     is_named = data == "send_named"
 
-    await save_state(user_id, type=decoded_type, is_named=is_named)
-
-    # 🔐 Блокируем возможность повторного обращения до ответа
-    # await lock_feedback(user_id)
+    await state_mgr.save_state(type=decoded_type, is_named=int(is_named))
 
     await send_feedback_prompt(bot, user_id, decoded_type, is_named)
     await callback.answer()
@@ -134,21 +144,19 @@ async def feedback_message_handler(message: Message):
         return
 
     user_id = message.from_user.id
-    feedback_key = f"user_state:{user_id}"
-
-    feedback = await get_user_state(user_id)
+    state_mgr = StateManager(user_id)
+    feedback = await state_mgr.get_state()
 
     if not feedback or not feedback.get("prompt_message_id"):
         logger.info(f"User {user_id} sent a message, but feedback prompt not expected. Ignoring.")
         return
 
-    is_blocked = await redis_client.exists(f"blocked:{user_id}")
-    if is_blocked:
+    if await state_mgr.is_blocked():
         await message.answer("❌ Вы заблокированы и не можете создавать обращения.")
         logger.info(f"Blocked user {user_id} попытался отправить обращение")
         return
 
-    if not await can_create_new_feedback(user_id):
+    if not await state_mgr.can_create_new():
         await message.answer("❗️ У вас уже есть открытое обращение. Пожалуйста, дождитесь ответа на предыдущее перед созданием нового.")
         return
 
@@ -158,7 +166,7 @@ async def feedback_message_handler(message: Message):
         await message.answer(str(e))
         return
 
-    await lock_feedback(user_id)
+    await state_mgr.lock()
 
     category = safe_str(feedback.get('type', 'Не указана'))
     is_named = safe_str(feedback.get('is_named', 'False')) == 'True'
@@ -211,12 +219,12 @@ async def feedback_message_handler(message: Message):
         logger.error(f"Failed to save feedback to Google Sheets: {e}")
 
     try:
-        await redis_client.delete(feedback_key)
+        await state_mgr.delete_state()
     except Exception as e:
         logger.warning(f"Failed to delete feedback key from Redis: {e}")
 
     for msg_id in {prompt_message_id, menu_message_id, image_message_id}:
-        if msg_id and msg_id.isdigit():
+        if msg_id and str(msg_id).isdigit():
             try:
                 await message.bot.delete_message(chat_id=user_id, message_id=int(msg_id))
                 logger.info(f"Deleted message {msg_id} for user {user_id}")
@@ -235,4 +243,7 @@ async def feedback_message_handler(message: Message):
 
     ack_message = await message.answer_photo(photo=ack_photo, caption=ACKNOWLEDGMENT_CAPTION, reply_markup=back_btn)
 
-    await save_menu_message_ids(user_id, image_id=ack_message.message_id, text_id=ack_message.message_id)
+    await state_mgr.save_state(
+        image_message_id=ack_message.message_id,
+        menu_message_id=ack_message.message_id
+    )

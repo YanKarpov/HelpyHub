@@ -1,5 +1,4 @@
 from aiogram import types
-from aiogram.filters import Command
 from src.utils.config import GROUP_CHAT_ID
 from src.services.redis_client import redis_client
 from src.utils.logger import setup_logger
@@ -8,7 +7,7 @@ logger = setup_logger(__name__)
 
 async def block_user_handler(message: types.Message):
     if message.chat.id != GROUP_CHAT_ID:
-        await message.answer("❌ Команда доступна только в группе поддержки.")
+        await message.answer("❌ Команда доступна только в группе админов.")
         return
 
     args = message.text.split()
@@ -27,7 +26,7 @@ async def block_user_handler(message: types.Message):
 
 async def unblock_user_handler(message: types.Message):
     if message.chat.id != GROUP_CHAT_ID:
-        await message.answer("❌ Команда доступна только в группе поддержки.")
+        await message.answer("❌ Команда доступна только в группе админов.")
         return
 
     args = message.text.split()

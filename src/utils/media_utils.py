@@ -1,23 +1,18 @@
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import FSInputFile, InputMediaPhoto, Message, ReplyKeyboardMarkup, InlineKeyboardMarkup
-from aiogram.types import CallbackQuery, Message as AiogramMessage
-from src.services.redis_client import redis_client, USER_STATE_KEY
+from aiogram.types import (
+    FSInputFile,
+    InputMediaPhoto,
+    Message,
+    ReplyKeyboardMarkup,
+    InlineKeyboardMarkup,
+    CallbackQuery,
+    Message as AiogramMessage,
+)
+
 from src.utils.logger import setup_logger
+from src.services.state_manager import StateManager  
 
 logger = setup_logger(__name__)
-
-
-async def save_state(user_id: int, key_prefix: str = USER_STATE_KEY, **kwargs) -> None:
-    """
-    Сохраняет словарь значений состояния пользователя в Redis.
-    """
-    key = key_prefix.format(user_id=user_id)
-    mapping = {k: str(v) for k, v in kwargs.items()}
-    await redis_client.hset(key, mapping=mapping)
-    await redis_client.expire(key, 3600)
-
-    for k, v in mapping.items():
-        logger.debug(f"[state] {user_id}: {k} = {v}")
 
 
 async def send_or_edit_media(
@@ -39,21 +34,18 @@ async def send_or_edit_media(
     if message_or_cb.from_user.is_bot:
         raise ValueError("Нельзя отправлять сообщения бот-пользователям.")
 
-    # Получаем предыдущее состояние пользователя
-    state_key = USER_STATE_KEY.format(user_id=user_id)
-    state = await redis_client.hgetall(state_key)
+    state_manager = StateManager(user_id)
+    state = await state_manager.get_state()
 
     image_msg_id = int(state.get("image_message_id", 0))
     text_msg_id = int(state.get("menu_message_id", 0))
 
-    # Проверка на невалидные ID
     if image_msg_id > 10_000_000 or text_msg_id > 10_000_000:
         logger.warning(f"[state] Невалидные ID сообщений у пользователя {user_id}. Обнуляем.")
         image_msg_id, text_msg_id = 0, 0
 
     try:
         if image_msg_id and text_msg_id:
-            # Пытаемся отредактировать изображение
             try:
                 await bot.edit_message_media(
                     chat_id=user_id,
@@ -71,7 +63,6 @@ async def send_or_edit_media(
                     logger.warning(f"[edit] Ошибка редактирования фото: {e}")
                     raise
 
-            # Пытаемся отредактировать текст
             try:
                 await bot.edit_message_text(
                     chat_id=user_id,
@@ -107,8 +98,7 @@ async def send_or_edit_media(
             reply_markup=reply_markup
         )
 
-        await save_state(
-            user_id,
+        await state_manager.save_state(
             image_message_id=image_msg.message_id,
             menu_message_id=text_msg.message_id
         )
