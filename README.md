@@ -1,36 +1,55 @@
 Описание позже, пока что просто красивая структура проекта ввиде дерева:
 ```
+├── .dockerignore
+├── .env.example
+├── .gitignore
+├── Dockerfile
+├── LICENSE
 ├── README.md
 ├── assets
 │   └── images
 │       ├── documents.jpg
+│       ├── feedback.jpg
 │       ├── other.jpg
+│       ├── redbutton.jpg
 │       ├── study.jpg
 │       ├── support.jpg
 │       ├── support_received.jpg
+│       ├── tech_issues.jpg
 │       └── welcome.jpg
+├── dev
+│   ├── dir_tree.py
+│   └── watchdog_runner.py
 ├── docker-compose.yml
 ├── main.py
 ├── requirements.txt
-├── service_account.json
 ├── src
 │   ├── bot.py
 │   ├── handlers
-│   │   ├── admin_reply.py
-│   │   ├── callback.py
-│   │   ├── feedback.py
-│   │   └── start.py
-│   ├── keyboard.py
+│   │   ├── admin_commands.py
+│   │   ├── admin_handler.py
+│   │   ├── callback_handler.py
+│   │   ├── feedback_handler.py
+│   │   └── start_handler.py
+│   ├── keyboards
+│   │   ├── identity.py
+│   │   ├── main_menu.py
+│   │   └── reply.py
 │   ├── services
 │   │   ├── google_sheets.py
-│   │   └── redis_client.py
+│   │   ├── message_service.py
+│   │   ├── redis_client.py
+│   │   └── state_manager.py
 │   └── utils
 │       ├── categories.py
 │       ├── config.py
-│       ├── dir_tree.py
+│       ├── filter_profanity.py
+│       ├── helpers.py
 │       ├── logger.py
 │       └── media_utils.py
-└── watchdog_runner.py
+├── tests
+│   ├── __init__.py
+│   └── test_profanity_filter.py
 ```
 
 ## Запуск и развёртывание проекта
