@@ -51,7 +51,7 @@
 │   ├── __init__.py
 │   └── test_profanity_filter.py
 ```
-## Архитектура
+## Архитектура бота
 
 ```mermaid
 flowchart TD
