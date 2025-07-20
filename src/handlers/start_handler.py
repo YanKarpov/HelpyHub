@@ -23,4 +23,4 @@ async def start_handler(message: Message):
         menu_message_id=text_msg.message_id
     )
 
-    logger.info(f"Sent start photo (id={photo_msg.message_id}) and text (id={text_msg.message_id}) to user {user_id}")
+    logger.info(f"Start handler triggered by user_id={message.from_user.id}, chat_id={message.chat.id}, message_id={message.message_id}")

@@ -8,6 +8,7 @@ from src.handlers.callback_handler import callback_handler
 from src.handlers.feedback_handler import feedback_message_handler
 from src.handlers.admin_handler import admin_reply_text_handler  
 from src.services.redis_client import redis_client
+from src.handlers.admin_commands import block_user_handler, unblock_user_handler
 
 from aiogram.types import Message
 from aiogram.filters import Filter
@@ -28,6 +29,9 @@ class IsAdminReplying(Filter):
 
 def register_handlers(dp: Dispatcher):
     dp.message.register(start_handler, Command(commands=["start"]))
+    dp.message.register(block_user_handler, Command(commands=["block_user"]))
+    dp.message.register(unblock_user_handler, Command(commands=["unblock_user"]))
     dp.callback_query.register(callback_handler)
     dp.message.register(admin_reply_text_handler, IsAdminReplying())
     dp.message.register(feedback_message_handler)
+    

@@ -71,12 +71,18 @@ async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
 
     logger.info(f"Feedback prompt sent to user {user_id} (named={is_named}) for type {feedback_type}")
 
-
 async def handle_feedback_choice(callback: CallbackQuery, data: str):
     if await handle_bot_user(callback):
         return
 
     user_id = callback.from_user.id
+
+    is_blocked = await redis_client.exists(f"blocked:{user_id}")
+    if is_blocked:
+        await callback.answer("❌ Вы заблокированы и не можете оставлять обращения.", show_alert=True)
+        logger.info(f"Blocked user {user_id} попытался выбрать категорию.")
+        return
+
     if not await can_create_new_feedback(user_id):
         await callback.answer(
             "❗️ У вас уже есть открытое обращение. Дождитесь ответа перед созданием нового. ❗️",
@@ -97,7 +103,6 @@ async def handle_feedback_choice(callback: CallbackQuery, data: str):
     await save_state(user_id, menu_message_id=msg.message_id)
     await callback.answer()
 
-
 async def handle_send_identity_choice(callback: CallbackQuery, data: str):
     if await handle_bot_user(callback):
         return
@@ -116,7 +121,7 @@ async def handle_send_identity_choice(callback: CallbackQuery, data: str):
     await save_state(user_id, type=decoded_type, is_named=is_named)
 
     # 🔐 Блокируем возможность повторного обращения до ответа
-    await lock_feedback(user_id)
+    # await lock_feedback(user_id)
 
     await send_feedback_prompt(bot, user_id, decoded_type, is_named)
     await callback.answer()
@@ -132,23 +137,26 @@ async def feedback_message_handler(message: Message):
 
     feedback = await get_user_state(user_id)
 
-    # ✅ Проверка: только если пользователь уже дошёл до этапа ввода фидбэка
     if not feedback or not feedback.get("prompt_message_id"):
         logger.info(f"User {user_id} sent a message, but feedback prompt not expected. Ignoring.")
+        return
+
+    is_blocked = await redis_client.exists(f"blocked:{user_id}")
+    if is_blocked:
+        await message.answer("❌ Вы заблокированы и не можете создавать обращения.")
+        logger.info(f"Blocked user {user_id} попытался отправить обращение")
         return
 
     if not await can_create_new_feedback(user_id):
         await message.answer("❗️ У вас уже есть открытое обращение. Пожалуйста, дождитесь ответа на предыдущее перед созданием нового.")
         return
 
-    # Проверка на нецензурную лексику
     try:
         ProfanityFilter().check_and_raise(message.text)
     except ValueError as e:
         await message.answer(str(e))
         return
 
-    # Уже заблокировано ранее, но повторная блокировка безопасна
     await lock_feedback(user_id)
 
     category = safe_str(feedback.get('type', 'Не указана'))
