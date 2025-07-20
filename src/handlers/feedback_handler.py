@@ -1,6 +1,7 @@
 import asyncio
 from aiogram.types import Message, FSInputFile, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from src.keyboard import get_reply_to_user_keyboard, get_identity_choice_keyboard
+from src.keyboards.identity import get_identity_choice_keyboard
+from src.keyboards.reply import get_reply_to_user_keyboard
 from src.utils.config import GROUP_CHAT_ID
 from src.utils.logger import setup_logger
 from src.services.redis_client import redis_client, can_create_new_feedback, lock_feedback

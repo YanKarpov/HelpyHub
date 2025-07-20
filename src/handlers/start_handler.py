@@ -1,5 +1,5 @@
 from aiogram.types import Message, FSInputFile
-from src.keyboard import get_main_keyboard
+from src.keyboards.main_menu import get_main_keyboard
 from src.utils.media_utils import save_state 
 from src.utils.logger import setup_logger
 from src.utils.categories import START_INFO  

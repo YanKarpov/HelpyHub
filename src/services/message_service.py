@@ -3,7 +3,7 @@ from aiogram.types.input_file import FSInputFile
 from aiogram.exceptions import TelegramBadRequest
 import json
 
-from src.keyboard import get_main_keyboard
+from src.keyboards.main_menu import get_main_keyboard
 from src.utils.helpers import (
     safe_str,
     get_user_state,

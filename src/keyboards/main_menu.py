@@ -21,18 +21,3 @@ def get_submenu_keyboard(category: str):
 
     buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main"))
     return InlineKeyboardMarkup(inline_keyboard=[[btn] for btn in buttons])
-
-def get_identity_choice_keyboard():
-    buttons = [
-        InlineKeyboardButton(text="Отправить анонимно", callback_data="send_anonymous"),
-        InlineKeyboardButton(text=" Я не против назвать себя", callback_data="send_named"),
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=[[btn] for btn in buttons])
-
-
-def get_reply_to_user_keyboard(user_id: int):
-    """Клавиатура с кнопкой 'Ответить' для админов."""
-    button = InlineKeyboardButton(
-        text="Ответить", callback_data=f"reply_to_user:{user_id}"
-    )
-    return InlineKeyboardMarkup(inline_keyboard=[[button]])
