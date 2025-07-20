@@ -1,5 +1,5 @@
 import pytest
-from filter_profanity import ProfanityFilter
+from src.utils.filter_profanity import ProfanityFilter
 
 BAD_WORDS = ["жопа", "мандарин"]
 
