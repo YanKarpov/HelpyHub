@@ -4,11 +4,7 @@ from aiogram.exceptions import TelegramBadRequest
 import json
 
 from src.keyboards.main_menu import get_main_keyboard
-from src.utils.helpers import (
-    safe_str,
-    handle_bot_user,
-    get_keyboard_for_category,
-)
+from src.utils.helpers import handle_bot_user, get_keyboard_for_category
 from src.utils.categories import CategoryInfo, CATEGORIES, START_INFO
 from src.services.state_manager import StateManager
 from src.utils.logger import setup_logger
@@ -37,12 +33,12 @@ async def _process_category_selection(bot, user_id, info: CategoryInfo, disabled
     state = StateManager(user_id)
     state_data = await state.get_state()
 
-    image_msg_id = int(safe_str(state_data.get("image_message_id", "0")))
-    text_msg_id = int(safe_str(state_data.get("menu_message_id", "0")))
+    image_msg_id = state_data.get("image_message_id", 0)
+    text_msg_id = state_data.get("menu_message_id", 0)
 
-    prev_text = safe_str(state_data.get("last_text", ""))
-    prev_image = safe_str(state_data.get("last_image", ""))
-    prev_keyboard = safe_str(state_data.get("last_keyboard", ""))
+    prev_text = state_data.get("last_text", "")
+    prev_image = state_data.get("last_image", "")
+    prev_keyboard = state_data.get("last_keyboard", "")
 
     keyboard = get_keyboard_for_category(info, disabled_category)
     keyboard_str = json.dumps(keyboard.model_dump())
@@ -90,8 +86,6 @@ async def _process_category_selection(bot, user_id, info: CategoryInfo, disabled
         )
 
 
-# Публичные хендлеры
-
 async def handle_category_selection(callback: CallbackQuery, data: str):
     if await handle_bot_user(callback):
         return
@@ -114,7 +108,7 @@ async def handle_back_to_main(callback: CallbackQuery):
     state = StateManager(user_id)
     state_data = await state.get_state()
 
-    ack_msg_id = int(safe_str(state_data.get("ack_message_id", "0")))
+    ack_msg_id = state_data.get("ack_message_id", 0)
 
     if ack_msg_id:
         try:
@@ -124,8 +118,8 @@ async def handle_back_to_main(callback: CallbackQuery):
         except Exception as e:
             logger.warning(f"[ack] Failed to delete message {ack_msg_id} for user {user_id}: {e}")
 
-    image_msg_id = int(safe_str(state_data.get("image_message_id", "0")))
-    text_msg_id = int(safe_str(state_data.get("menu_message_id", "0")))
+    image_msg_id = state_data.get("image_message_id", 0)
+    text_msg_id = state_data.get("menu_message_id", 0)
 
     info = CategoryInfo(
         image=START_INFO.image,

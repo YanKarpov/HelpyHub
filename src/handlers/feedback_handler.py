@@ -18,14 +18,13 @@ from src.utils.categories import (
     SUBCATEGORIES
 )
 from src.utils.media_utils import send_or_edit_media
-from src.utils.helpers import safe_str, handle_bot_user
+from src.utils.helpers import handle_bot_user
 from src.utils.filter_profanity import ProfanityFilter
 from src.services.google_sheets import append_feedback_to_sheet
 
 logger = setup_logger(__name__)
 
-
-async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
+async def send_feedback_prompt(bot, user_id, feedback_type):
     state_mgr = StateManager(user_id)
 
     if feedback_type in SUBCATEGORIES:
@@ -39,8 +38,8 @@ async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
         message_text = info.text
 
     state = await state_mgr.get_state()
-    image_msg_id = int(safe_str(state.get("image_message_id", 0)))
-    text_msg_id = int(safe_str(state.get("menu_message_id", 0)))
+    image_msg_id = state.get("image_message_id", 0)
+    text_msg_id = state.get("menu_message_id", 0)
 
     logger.info(f"Current saved state for user {user_id}: image_msg_id={image_msg_id}, text_msg_id={text_msg_id}")
 
@@ -75,8 +74,7 @@ async def send_feedback_prompt(bot, user_id, feedback_type, is_named):
             prompt_message_id=text_msg.message_id
         )
 
-    logger.info(f"Feedback prompt sent to user {user_id} (named={is_named}) for type {feedback_type}")
-
+    logger.info(f"Feedback prompt sent to user {user_id} for type {feedback_type}")
 
 async def handle_feedback_choice(callback: CallbackQuery, data: str):
     if await handle_bot_user(callback):
@@ -90,7 +88,7 @@ async def handle_feedback_choice(callback: CallbackQuery, data: str):
         logger.info(f"Blocked user {user_id} попытался выбрать категорию.")
         return
 
-    if not await state_mgr.can_create_new():
+    if not await state_mgr.can_create_feedback():
         await callback.answer(
             "❗️ У вас уже есть открытое обращение. Дождитесь ответа перед созданием нового. ❗️",
             show_alert=True
@@ -115,7 +113,6 @@ async def handle_feedback_choice(callback: CallbackQuery, data: str):
 
     await callback.answer()
 
-
 async def handle_send_identity_choice(callback: CallbackQuery, data: str):
     if await handle_bot_user(callback):
         return
@@ -129,14 +126,10 @@ async def handle_send_identity_choice(callback: CallbackQuery, data: str):
         await callback.answer("Что-то пошло не так. Попробуй ещё раз.", show_alert=True)
         return
 
-    decoded_type = safe_str(feedback_type)
     is_named = data == "send_named"
-
-    await state_mgr.save_state(type=decoded_type, is_named=int(is_named))
-
-    await send_feedback_prompt(bot, user_id, decoded_type, is_named)
+    await state_mgr.save_state(type=feedback_type, is_named=is_named)
+    await send_feedback_prompt(bot, user_id, feedback_type)
     await callback.answer()
-
 
 async def feedback_message_handler(message: Message):
     if message.chat.type != "private":
@@ -156,7 +149,7 @@ async def feedback_message_handler(message: Message):
         logger.info(f"Blocked user {user_id} попытался отправить обращение")
         return
 
-    if not await state_mgr.can_create_new():
+    if not await state_mgr.can_create_feedback():
         await message.answer("❗️ У вас уже есть открытое обращение. Пожалуйста, дождитесь ответа на предыдущее перед созданием нового.")
         return
 
@@ -166,13 +159,13 @@ async def feedback_message_handler(message: Message):
         await message.answer(str(e))
         return
 
-    await state_mgr.lock()
+    await state_mgr.lock_user()
 
-    category = safe_str(feedback.get('type', 'Не указана'))
-    is_named = safe_str(feedback.get('is_named', 'False')) == 'True'
-    prompt_message_id = safe_str(feedback.get('prompt_message_id')) or None
-    menu_message_id = safe_str(feedback.get('menu_message_id')) or None
-    image_message_id = safe_str(feedback.get('image_message_id')) or None
+    category = feedback.get('type', 'Не указана')
+    is_named = feedback.get('is_named', False)
+    prompt_message_id = feedback.get('prompt_message_id')
+    menu_message_id = feedback.get('menu_message_id')
+    image_message_id = feedback.get('image_message_id')
 
     logger.info(f"Feedback state for user {user_id}: prompt_message_id={prompt_message_id}, menu_message_id={menu_message_id}, image_message_id={image_message_id}")
 
@@ -183,13 +176,13 @@ async def feedback_message_handler(message: Message):
     if category == "Срочная помощь":
         text = URGENT_FEEDBACK_NOTIFICATION_TEMPLATE.format(
             sender_display_name=sender_display_name,
-            message_text=message.text,
+            message_text=message.text
         )
     else:
         text = FEEDBACK_NOTIFICATION_TEMPLATE.format(
             sender_display_name=sender_display_name,
             category=category,
-            message_text=message.text,
+            message_text=message.text
         )
 
     try:
@@ -210,7 +203,7 @@ async def feedback_message_handler(message: Message):
             sender_display_name,
             category,
             message.text,
-            "", "", "",  # answer_text, admin_id, admin_username
+            "", "", "",
             "Ожидает ответа",
             is_named
         )
@@ -218,15 +211,12 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.error(f"Failed to save feedback to Google Sheets: {e}")
 
-    try:
-        await state_mgr.delete_state()
-    except Exception as e:
-        logger.warning(f"Failed to delete feedback key from Redis: {e}")
+    await state_mgr.clear_state()
 
     for msg_id in {prompt_message_id, menu_message_id, image_message_id}:
-        if msg_id and str(msg_id).isdigit():
+        if msg_id:
             try:
-                await message.bot.delete_message(chat_id=user_id, message_id=int(msg_id))
+                await message.bot.delete_message(chat_id=user_id, message_id=msg_id)
                 logger.info(f"Deleted message {msg_id} for user {user_id}")
             except Exception as e:
                 logger.warning(f"Failed to delete message {msg_id}: {e}")
@@ -241,7 +231,11 @@ async def feedback_message_handler(message: Message):
         inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main")]]
     )
 
-    ack_message = await message.answer_photo(photo=ack_photo, caption=ACKNOWLEDGMENT_CAPTION, reply_markup=back_btn)
+    ack_message = await message.answer_photo(
+        photo=ack_photo,
+        caption=ACKNOWLEDGMENT_CAPTION,
+        reply_markup=back_btn
+    )
 
     await state_mgr.save_state(
         image_message_id=ack_message.message_id,

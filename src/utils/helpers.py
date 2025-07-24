@@ -1,16 +1,6 @@
 from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
-
-def safe_str(value) -> str:
-    """
-    Универсальное приведение значения к строке.
-    """
-    if isinstance(value, bytes):
-        return value.decode("utf-8")
-    return str(value)
-
-
 def get_keyboard_for_category(info, disabled_category):
     """
     Возвращает соответствующую клавиатуру по категории.
