@@ -65,16 +65,3 @@ def update_feedback_in_sheet(
 
     return False
 
-
-# Тестовое соединение
-# if __name__ == "__main__":
-#     append_feedback_to_sheet(
-#         user_id=123456789,
-#         username="user123",
-#         category="Обратная связь",
-#         message_text="Пример сообщения для теста",
-#         answer_text="",
-#         admin_id="",
-#         status="Ожидает ответа"
-#     )
-#     print("Данные успешно отправлены в таблицу")

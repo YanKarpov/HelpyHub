@@ -228,7 +228,7 @@ async def feedback_message_handler(message: Message):
 
     ack_photo = FSInputFile(ACKNOWLEDGMENT_IMAGE_PATH)
     back_btn = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main")]]
+        inline_keyboard=[[InlineKeyboardButton(text="Назад", callback_data="back_to_main")]]
     )
 
     ack_message = await message.answer_photo(

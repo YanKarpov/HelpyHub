@@ -19,5 +19,5 @@ def get_submenu_keyboard(category: str):
             InlineKeyboardButton(text="Срочная помощь", callback_data="Срочная помощь")
         ])
 
-    buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main"))
+    buttons.append(InlineKeyboardButton(text="Назад", callback_data="back_to_main"))
     return InlineKeyboardMarkup(inline_keyboard=[[btn] for btn in buttons])
