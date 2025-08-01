@@ -9,6 +9,12 @@
 
 # HelpyBot - Telegram бот для обратной связи
 
+<p align="center">
+  <img src="assets/images/BotStartMessage.png" alt="Первый экран" width="500"/>
+  <br>
+  <em>Начальный экран бота — приветствие и вводное сообщение</em>
+</p>
+
 
 ## Структура проекта
 ```
