@@ -12,11 +12,8 @@ async def handle_admin_reply(callback: CallbackQuery, data: str):
         target_user_id = int(data.split(":", 1)[1])
         state_manager = StateManager(user_id)
         
-        await state_manager.save_state_with_ttl(
-            field="admin_replying_to",
-            value=str(target_user_id),
-            ttl=1800
-        )
+        # Вместо save_state_with_ttl используем set_admin_reply_target с TTL
+        await state_manager.set_admin_reply_target(target_user_id=target_user_id, expire=1800)
         
         new_text = callback.message.text + "\n\nНапишите ответ для пользователя и я его отправлю"
         await callback.message.edit_text(new_text)
@@ -24,7 +21,6 @@ async def handle_admin_reply(callback: CallbackQuery, data: str):
     except ValueError:
         logger.error(f"Invalid user ID in reply_to_user: {data}")
         await callback.answer("Некорректный ID", show_alert=True)
-
 
 async def admin_reply_text_handler(message: Message):
     admin_id = message.from_user.id
