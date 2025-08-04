@@ -26,22 +26,28 @@ class IsAdminReplying(Filter):
         return bool(result)
 
 async def chat_info_handler(message: Message):
-    """Обработчик команды /chat_info"""
+    """Обработчик команды /chat_info с выводом ID подтемы, если есть"""
+    chat_type = 'личный' if message.chat.type == 'private' else 'группа'
+    thread_id = message.message_thread_id
+
     chat_info = (
         f"Информация о чате:\n"
-        f"• Тип чата: {'группа' if message.chat.type != 'private' else 'личный'}\n"
+        f"• Тип чата: {chat_type}\n"
         f"• Chat ID: `{message.chat.id}`\n"
     )
-    
-    # Логируем информацию
+
+    if thread_id is not None:
+        chat_info += f"• ID подтемы (Thread ID): `{thread_id}`\n"
+
+    # Логируем
     logger.info(
-        f"Запрос chat_info: "
-        f"chat_id={message.chat.id}, "
-        f"type={message.chat.type}"
+        f"Запрос chat_info: chat_id={message.chat.id}, "
+        f"type={message.chat.type}, thread_id={thread_id}"
     )
-    
-    # Отправляем ответ пользователю
+
     await message.reply(chat_info, parse_mode="Markdown")
+
+
 
 def register_handlers(dp: Dispatcher):
     # Основные обработчики

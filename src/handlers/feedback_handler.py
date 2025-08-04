@@ -6,7 +6,7 @@ from aiogram.types import (
 
 from src.keyboards.identity import get_identity_choice_keyboard
 from src.keyboards.reply import get_reply_to_user_keyboard
-from src.utils.config import GROUP_CHAT_ID
+from src.utils.config import GROUP_CHAT_ID, SUPPORT_THREAD_ID
 from src.utils.logger import setup_logger
 from src.services.state_manager import StateManager
 from src.utils.categories import (
@@ -188,6 +188,7 @@ async def feedback_message_handler(message: Message):
     try:
         await message.bot.send_message(
             chat_id=GROUP_CHAT_ID,
+            message_thread_id=SUPPORT_THREAD_ID,
             text=text,
             reply_markup=get_reply_to_user_keyboard(user_id)
         )

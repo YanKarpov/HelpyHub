@@ -5,6 +5,16 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
+SUPPORT_THREAD_ID = os.getenv("SUPPORT_THREAD_ID")
+
+if not SUPPORT_THREAD_ID:
+    raise ValueError("Переменная окружения SUPPORT_THREAD_ID не установлена!")
+
+try:
+    SUPPORT_THREAD_ID = int(SUPPORT_THREAD_ID)
+except ValueError:
+    raise ValueError("SUPPORT_THREAD_ID должен быть числом (int), проверь .env файл.")
+
 
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не установлена!")
