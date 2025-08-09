@@ -3,6 +3,8 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.types import Message
 from aiogram.filters import Filter
+from src.handlers.back_handler import back_handler
+
 
 from src.utils.config import BOT_TOKEN
 from src.handlers.start_handler import start_handler
@@ -56,5 +58,6 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(unblock_user_handler, Command(commands=["unblock_user"]))
     dp.message.register(chat_info_handler, Command(commands=["chat_info"]))  # Новая команда
     dp.callback_query.register(callback_handler)
+    dp.callback_query.register(back_handler, lambda c: c.data == "back")  # <-- тут
     dp.message.register(admin_reply_text_handler, IsAdminReplying())
     dp.message.register(feedback_message_handler)

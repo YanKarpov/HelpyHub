@@ -3,6 +3,7 @@ from aiogram.types import (
     Message, FSInputFile, InputMediaPhoto,
     InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 )
+from src.keyboards.main_menu import back_button  # <-- импортируем функцию кнопки назад
 
 from src.keyboards.identity import get_identity_choice_keyboard
 from src.keyboards.reply import get_reply_to_user_keyboard
@@ -24,6 +25,7 @@ from src.services.google_sheets import append_feedback_to_sheet
 
 logger = setup_logger(__name__)
 
+
 async def send_feedback_prompt(bot, user_id, feedback_type):
     state_mgr = StateManager(user_id)
 
@@ -32,7 +34,10 @@ async def send_feedback_prompt(bot, user_id, feedback_type):
         message_text = info.text
     elif feedback_type in CATEGORIES:
         info = CATEGORIES[feedback_type]
-        message_text = info.text if feedback_type == "Другое" else f"Опиши проблему по теме '{feedback_type}':\n\n{info.text}"
+        message_text = (
+            info.text if feedback_type == "Другое"
+            else f"Опиши проблему по теме '{feedback_type}':\n\n{info.text}"
+        )
     else:
         info = CATEGORIES["Другое"]
         message_text = info.text
@@ -42,6 +47,8 @@ async def send_feedback_prompt(bot, user_id, feedback_type):
     text_msg_id = state.get("menu_message_id", 0)
 
     logger.info(f"Current saved state for user {user_id}: image_msg_id={image_msg_id}, text_msg_id={text_msg_id}")
+
+    back_kb = InlineKeyboardMarkup(inline_keyboard=[[back_button()]])  # Кнопка назад
 
     if image_msg_id and text_msg_id:
         logger.info(f"Editing existing messages for user {user_id}")
@@ -59,14 +66,14 @@ async def send_feedback_prompt(bot, user_id, feedback_type):
                 chat_id=user_id,
                 message_id=text_msg_id,
                 text=message_text,
-                reply_markup=None
+                reply_markup=back_kb  # Добавляем кнопку назад
             )
             await state_mgr.save_state(prompt_message_id=text_msg_id)
         except Exception as e:
             logger.warning(f"Failed to edit feedback text for user {user_id}: {e}")
     else:
         image_msg = await bot.send_photo(chat_id=user_id, photo=FSInputFile(info.image))
-        text_msg = await bot.send_message(chat_id=user_id, text=message_text)
+        text_msg = await bot.send_message(chat_id=user_id, text=message_text, reply_markup=back_kb)  # с кнопкой назад
 
         await state_mgr.save_state(
             image_message_id=image_msg.message_id,
@@ -75,6 +82,7 @@ async def send_feedback_prompt(bot, user_id, feedback_type):
         )
 
     logger.info(f"Feedback prompt sent to user {user_id} for type {feedback_type}")
+
 
 async def handle_feedback_choice(callback: CallbackQuery, data: str):
     if await handle_bot_user(callback):
@@ -97,6 +105,7 @@ async def handle_feedback_choice(callback: CallbackQuery, data: str):
         return
 
     await state_mgr.set_feedback_type(data, expire=300)
+    await state_mgr.push_nav("identity_choice", {"category": data})
 
     msg = await send_or_edit_media(
         callback,
@@ -113,6 +122,7 @@ async def handle_feedback_choice(callback: CallbackQuery, data: str):
 
     await callback.answer()
 
+
 async def handle_send_identity_choice(callback: CallbackQuery, data: str):
     if await handle_bot_user(callback):
         return
@@ -128,8 +138,11 @@ async def handle_send_identity_choice(callback: CallbackQuery, data: str):
 
     is_named = data == "send_named"
     await state_mgr.save_state(type=feedback_type, is_named=is_named)
+    await state_mgr.push_nav("feedback_prompt", {"feedback_type": feedback_type})
+
     await send_feedback_prompt(bot, user_id, feedback_type)
     await callback.answer()
+
 
 async def feedback_message_handler(message: Message):
     if message.chat.type != "private":
@@ -227,9 +240,10 @@ async def feedback_message_handler(message: Message):
     except Exception as e:
         logger.warning(f"Failed to delete user message: {e}")
 
+    # Показываем экран подтверждения и сбрасываем стек
     ack_photo = FSInputFile(ACKNOWLEDGMENT_IMAGE_PATH)
     back_btn = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="Назад", callback_data="back_to_main")]]
+        inline_keyboard=[[back_button()]]  # Используем централизованную функцию
     )
 
     ack_message = await message.answer_photo(
@@ -238,6 +252,7 @@ async def feedback_message_handler(message: Message):
         reply_markup=back_btn
     )
 
+    await state_mgr.reset_nav()
     await state_mgr.save_state(
         image_message_id=ack_message.message_id,
         menu_message_id=ack_message.message_id

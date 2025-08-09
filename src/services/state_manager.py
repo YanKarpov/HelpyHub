@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Dict, Optional, Union
 import asyncio
+import json
 from src.services.redis_client import redis_client
 from src.utils.logger import setup_logger  
 
@@ -9,6 +10,7 @@ FEEDBACK_TYPE_KEY = "feedback_type:{user_id}"
 FEEDBACK_LOCK_KEY = "feedback_lock:{user_id}"
 BLOCKED_USER_KEY = "blocked:{user_id}"
 ADMIN_REPLYING_KEY = "admin_replying:{admin_id}"
+NAV_STACK_KEY = "nav_stack:{user_id}"  
 
 class StateManager:
     
@@ -19,9 +21,11 @@ class StateManager:
         self.blocked_key = BLOCKED_USER_KEY.format(user_id=user_id)
         self.lock_key = FEEDBACK_LOCK_KEY.format(user_id=user_id)
         self.admin_replying_key = ADMIN_REPLYING_KEY.format(admin_id=user_id)
+        self.nav_stack_key = NAV_STACK_KEY.format(user_id=user_id)  
         self.logger = logger or setup_logger(__name__)
 
-    # Основные методы работы с состоянием
+    # Общие методы состояния
+
     async def save_state(self, **kwargs) -> None:
         if not kwargs:
             return
@@ -34,16 +38,12 @@ class StateManager:
 
         await redis_client.hset(self.state_key, mapping=processed)
 
-        # Формируем сокращённый лог
-        simple_processed = {}
-        for k, v in processed.items():
-            if isinstance(v, str) and len(v) > 100:
-                simple_processed[k] = f"<long string, length={len(v)}>"
-            else:
-                simple_processed[k] = v
+        simple_processed = {
+            k: (f"<long string, length={len(v)}>" if isinstance(v, str) and len(v) > 100 else v)
+            for k, v in processed.items()
+        }
 
         self.logger.info(f"[User {self.user_id}] save_state: {simple_processed}")
-
 
     async def get_state(self) -> Dict[str, Any]:
         raw_state = await redis_client.hgetall(self.state_key) or {}
@@ -53,13 +53,10 @@ class StateManager:
             for k, v in raw_state.items()
         }
         
-        # Для логирования: убираем детали, если значение — длинная строка (например JSON)
-        simple_state = {}
-        for k, v in state.items():
-            if isinstance(v, str) and len(v) > 100:
-                simple_state[k] = f"<long string, length={len(v)}>"
-            else:
-                simple_state[k] = v
+        simple_state = {
+            k: (f"<long string, length={len(v)}>" if isinstance(v, str) and len(v) > 100 else v)
+            for k, v in state.items()
+        }
 
         self.logger.info(f"[User {self.user_id}] get_state: {simple_state}")
         return state
@@ -87,13 +84,13 @@ class StateManager:
         await asyncio.gather(
             redis_client.delete(self.state_key),
             redis_client.delete(self.feedback_type_key),
-            # redis_client.delete(self.lock_key),
             redis_client.delete(self.admin_replying_key),
             redis_client.delete(self.blocked_key)
         )
         self.logger.info(f"[User {self.user_id}] clear_state called")
 
-    # Методы для работы с feedback
+    # Feedback / блокировки
+
     async def set_feedback_type(self, feedback_type: str, expire: int = 300):
         await redis_client.set(self.feedback_type_key, feedback_type, ex=expire)
         self.logger.info(f"[User {self.user_id}] set_feedback_type: {feedback_type} (expire={expire})")
@@ -108,29 +105,26 @@ class StateManager:
         await redis_client.delete(self.feedback_type_key)
         self.logger.info(f"[User {self.user_id}] delete_feedback_type")
 
-    # Методы блокировки/разблокировки
     async def lock_user(self, expire: int = 3600) -> None:
         result = await redis_client.set(self.lock_key, "1", ex=expire)
-        self.logger.info(f"[User {self.user_id}] lock_user set lock_key with expire {expire}, result: {result}")
+        self.logger.info(f"[User {self.user_id}] lock_user expire={expire}, result: {result}")
 
     async def unlock_user(self) -> None:
         await redis_client.delete(self.lock_key)
-        self.logger.info(f"[User {self.user_id}] unlock_user deleted lock_key")
+        self.logger.info(f"[User {self.user_id}] unlock_user")
 
     async def can_create_feedback(self) -> bool:
         exists = await redis_client.exists(self.lock_key)
         can_create = exists == 0
-        self.logger.info(f"[User {self.user_id}] can_create_feedback: lock_key exists={exists}, can_create={can_create}")
+        self.logger.info(f"[User {self.user_id}] can_create_feedback: {can_create}")
         return can_create
 
-    # Методы блокировки пользователя
     async def block_user(self, expire: int = None) -> None:
         if expire:
             await redis_client.set(self.blocked_key, "1", ex=expire)
-            self.logger.info(f"[User {self.user_id}] block_user with expire {expire}")
         else:
             await redis_client.set(self.blocked_key, "1")
-            self.logger.info(f"[User {self.user_id}] block_user without expire")
+        self.logger.info(f"[User {self.user_id}] block_user expire={expire}")
 
     async def unblock_user(self) -> None:
         await redis_client.delete(self.blocked_key)
@@ -142,7 +136,8 @@ class StateManager:
         self.logger.info(f"[User {self.user_id}] is_blocked: {blocked}")
         return blocked
 
-    # Методы для работы с админскими ответами
+    # Админ-ответы
+
     async def set_admin_reply_target(self, target_user_id: int, expire: int = 3600) -> None:
         await redis_client.set(self.admin_replying_key, str(target_user_id), ex=expire)
         self.logger.info(f"[User {self.user_id}] set_admin_reply_target: {target_user_id} (expire={expire})")
@@ -150,17 +145,82 @@ class StateManager:
     async def get_admin_reply_target(self) -> Optional[int]:
         target = await redis_client.get(self.admin_replying_key)
         if target:
-            target_int = int(target)
-            self.logger.info(f"[User {self.user_id}] get_admin_reply_target: {target_int}")
-            return target_int
-        self.logger.info(f"[User {self.user_id}] get_admin_reply_target: None")
+            return int(target)
         return None
 
-    # Синонимы для совместимости
+    # Навигация
+
+    async def _read_nav_stack(self):
+        raw = await redis_client.get(self.nav_stack_key)
+        if not raw:
+            return [{"screen": "main", "params": {}}]
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return [{"screen": "main", "params": {}}]
+
+    async def _write_nav_stack(self, stack):
+        await redis_client.set(self.nav_stack_key, json.dumps(stack))
+
+    async def reset_nav(self):
+        """Сбросить стек до главного экрана"""
+        await self._write_nav_stack([{"screen": "main", "params": {}}])
+        self.logger.info(f"[User {self.user_id}] reset_nav -> main")
+
+    async def clear_nav(self):
+        """Полностью очистить навигацию"""
+        await redis_client.delete(self.nav_stack_key)
+        self.logger.info(f"[User {self.user_id}] clear_nav")
+
+    async def push_nav(self, screen: str, params: dict = None):
+        """Добавить новый экран в стек"""
+        stack = await self._read_nav_stack()
+        stack.append({"screen": screen, "params": params or {}})
+        await self._write_nav_stack(stack)
+        self.logger.info(f"[User {self.user_id}] push_nav -> {screen} {params}")
+
+    async def pop_nav(self):
+        """Удалить последний экран и вернуть предыдущий"""
+        stack = await self._read_nav_stack()
+        if len(stack) <= 1:
+            return stack[0]
+        stack.pop()
+        await self._write_nav_stack(stack)
+        self.logger.info(f"[User {self.user_id}] pop_nav -> {stack[-1]}")
+        return stack[-1]
+
+    async def go_back(self):
+        """Вернуться на предыдущий экран (для кнопки Назад)"""
+        prev = await self.pop_nav()
+        return prev["screen"], prev["params"]
+
+    async def goto_nav(self, screen: str, params: dict = None):
+        """Перейти на конкретный экран, обрезав стек"""
+        stack = await self._read_nav_stack()
+        for i, entry in enumerate(stack):
+            if entry["screen"] == screen:
+                stack = stack[:i+1]
+                if params is not None:
+                    stack[-1]["params"] = params
+                await self._write_nav_stack(stack)
+                self.logger.info(f"[User {self.user_id}] goto_nav -> {screen} {params}")
+                return
+        await self.push_nav(screen, params)
+
+    async def current_nav(self):
+        """Получить текущий экран"""
+        stack = await self._read_nav_stack()
+        return stack[-1]
+
+
+    # Aliases
+
     lock_feedback = lock_user
     unlock_feedback = unlock_user
     can_create_new = can_create_feedback
     can_create_new_feedback = can_create_feedback
+
+    # Helpers
 
     @staticmethod
     def _serialize_value(value: Any) -> str:
@@ -172,9 +232,11 @@ class StateManager:
     def _deserialize_value(value: Union[str, bytes]) -> Any:
         if isinstance(value, bytes):
             value = value.decode()
-        
         if value == "true":
             return True
         elif value == "false":
             return False
         return value
+
+    async def get_nav_stack(self):
+        return await self._read_nav_stack()

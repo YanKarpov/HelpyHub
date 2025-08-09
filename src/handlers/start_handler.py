@@ -6,25 +6,37 @@ from src.services.state_manager import StateManager
 
 logger = setup_logger(__name__)
 
-
 async def start_handler(message: Message):
     user_id = message.from_user.id
     logger.info(f"/start received from user {user_id}")
 
     state_manager = StateManager(user_id)
 
+    # Сбрасываем стек навигации на главный экран
+    await state_manager.reset_nav()
+    # await state_manager.push_nav("main")
+
+
     photo = FSInputFile(START_INFO.image)
-    caption_text = START_INFO.text.format(full_name=message.from_user.full_name)
+    caption_text = START_INFO.text.format(full_name=message.from_user.full_name or "друг")
 
-    photo_msg = await message.answer_photo(photo=photo)
-    text_msg = await message.answer(caption_text, reply_markup=get_main_keyboard())
+    try:
+        photo_msg = await message.answer_photo(photo=photo)
+        text_msg = await message.answer(caption_text, reply_markup=get_main_keyboard())
 
-    await state_manager.save_state(
-        image_message_id=photo_msg.message_id,
-        menu_message_id=text_msg.message_id
-    )
+        # Сохраняем состояние (ID сообщений + экран)
+        await state_manager.save_state(
+            image_message_id=photo_msg.message_id,
+            menu_message_id=text_msg.message_id,
+            last_text=caption_text,
+            last_image=START_INFO.image,
+            last_keyboard=get_main_keyboard().model_dump()  # если используется pydantic-модель
+        )
 
-    logger.info(
-        f"Start handler triggered by user_id={user_id}, "
-        f"chat_id={message.chat.id}, message_id={message.message_id}"
-    )
+        logger.info(
+            f"Start handler triggered by user_id={user_id}, "
+            f"chat_id={message.chat.id}, message_id={message.message_id}, "
+            f"nav reset -> main"
+        )
+    except Exception as e:
+        logger.error(f"Failed to send start menu to user {user_id}: {e}")
