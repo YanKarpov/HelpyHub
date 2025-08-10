@@ -61,31 +61,47 @@ async def back_handler(callback: CallbackQuery):
     user_id = callback.from_user.id
     state_mgr = StateManager(user_id)
 
+    # Логируем стек до возврата
+    stack_before = await state_mgr.get_nav_stack()
+    logger.info(f"[nav] User {user_id} nav stack before go_back: {stack_before}")
+
     screen, params = await state_mgr.go_back()
+
+    # Логируем стек после возврата
+    stack_after = await state_mgr.get_nav_stack()
+    logger.info(f"[nav] User {user_id} nav stack after go_back: {stack_after}")
+    logger.info(f"User {user_id} возвращается на экран '{screen}' с params={params}")
 
     if not screen:
         logger.info(f"User {user_id} нажал 'Назад', но стек пуст.")
         await callback.answer("Нет предыдущего экрана", show_alert=True)
         return
 
-    logger.info(f"User {user_id} возвращается на экран '{screen}' с params={params}")
+    # При возврате с экранов обратной связи очищаем связанное состояние
+    if screen in {"identity_choice", "feedback_prompt", "feedback_ack"}:
+        await state_mgr.clear_feedback_state()
 
-    # Рендерим нужный экран
+    # Рендерим нужный экран и обновляем стек навигации, чтобы поддерживать корректный переход назад
     if screen == "main":
         edited = await try_edit_main_menu(callback.bot, user_id, state_mgr, callback.from_user.full_name)
         if not edited:
             await start_handler(callback.message)
+        # Убеждаемся, что стек содержит main
+        await state_mgr.goto_nav("main")
 
     elif screen == "identity_choice":
         category = params.get("category", "Другое")
         await handle_feedback_choice(callback, category)
+        await state_mgr.goto_nav("identity_choice", {"category": category})
 
     elif screen == "feedback_prompt":
         feedback_type = params.get("feedback_type", "Другое")
         await send_feedback_prompt(callback.bot, user_id, feedback_type)
+        await state_mgr.goto_nav("feedback_prompt", {"feedback_type": feedback_type})
 
     elif screen == "feedback_ack":
         await start_handler(callback.message)
+        await state_mgr.goto_nav("feedback_ack")
 
     else:
         logger.warning(f"Неизвестный экран '{screen}', возвращаем в main")

@@ -240,3 +240,12 @@ class StateManager:
 
     async def get_nav_stack(self):
         return await self._read_nav_stack()
+
+    async def clear_feedback_state(self):
+        """Сбросить состояние, связанное с процессом обратной связи"""
+        await self.delete_state_field("prompt_message_id")
+        await self.delete_state_field("type")
+        await self.delete_state_field("is_named")
+        await self.delete_feedback_type()
+        await self.unlock_user()
+        self.logger.info(f"[User {self.user_id}] clear_feedback_state called")
