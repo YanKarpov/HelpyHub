@@ -3,7 +3,6 @@ from src.services.state_manager import StateManager
 from src.utils.logger import setup_logger
 from src.services.google_sheets import update_feedback_in_sheet
 from src.services.redis_client import redis_client
-
 import asyncio
 
 logger = setup_logger(__name__)
@@ -14,12 +13,14 @@ async def handle_admin_reply(callback: CallbackQuery, data: str):
         target_user_id = int(data.split(":", 1)[1])
         state_manager = StateManager(admin_id)
         
-        await state_manager.set_admin_reply_target(target_user_id=target_user_id, expire=1800)
-        
-        new_text = callback.message.text + "\n\nНапишите ответ для пользователя и я его отправлю"
+        # Сохраняем цель и чат, откуда был ответ
+        await state_manager.set_admin_reply_target(target_user_id, expire=1800)
+        await state_manager.save_state(admin_replying_from_chat=callback.message.chat.id)
+
+        new_text = callback.message.text + "\n\nНапишите ответ для пользователя, и я его отправлю."
         await callback.message.edit_text(new_text)
-        
-        logger.info(f"Admin {admin_id} started replying to user {target_user_id}")
+
+        logger.info(f"Admin {admin_id} started replying to user {target_user_id} from chat {callback.message.chat.id}")
     except ValueError:
         logger.error(f"Invalid user ID in reply_to_user: {data}")
         await callback.answer("Некорректный ID", show_alert=True)
@@ -37,29 +38,41 @@ async def admin_reply_text_handler(message: Message):
     state_manager = StateManager(admin_id)
 
     try:
-        user_id = await state_manager.get_state_field("admin_replying_to")
-        if user_id is None:
-            logger.info(f"Admin {admin_id} sent message but is not in reply mode, ignoring.")
+        user_id = await state_manager.get_admin_reply_target()
+        chat_id = await state_manager.get_state_field("admin_replying_from_chat")
+
+        # Проверяем, что сообщение пришло из того же чата, где начат ответ
+        if user_id is None or chat_id is None or message.chat.id != int(chat_id):
+            logger.info(
+                f"Admin {admin_id} sent message from wrong chat ({message.chat.id}), "
+                f"expected {chat_id}. Ignoring."
+            )
             return
 
-        await message.bot.send_message(chat_id=int(user_id), text=f"Ответ от службы поддержки:\n\n{message.text}")
+        await message.bot.send_message(
+            chat_id=user_id,
+            text=f"Ответ от службы поддержки:\n\n{message.text}"
+        )
         await message.reply("Сообщение успешно отправлено пользователю.")
 
         admin_username = message.from_user.username or ""
         await asyncio.get_event_loop().run_in_executor(
             None,
             update_feedback_in_sheet,
-            int(user_id),
+            user_id,
             message.text,
             str(admin_id),
             admin_username,
             "Вопрос закрыт"
         )
 
-        user_state_manager = StateManager(int(user_id))
-        await user_state_manager.unlock_feedback()
+        # Разблокируем пользователя
+        await StateManager(user_id).unlock_feedback()
 
-        await state_manager.delete_state_field("admin_replying_to")
+        # Очищаем состояния
+        await state_manager.delete_state_field("admin_replying_from_chat")
+        await state_manager.delete_state_field("admin_replying_to")  # для совместимости, если где-то использовалось
+        await redis_client.delete(state_manager.admin_replying_key)
 
         logger.info(f"Admin {admin_id} finished replying to user {user_id}")
 
