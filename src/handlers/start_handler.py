@@ -14,8 +14,9 @@ async def start_handler(message: Message):
 
     # Сбрасываем стек навигации на главный экран
     await state_manager.reset_nav()
-    # await state_manager.push_nav("main")
 
+    # Очищаем состояние обратной связи, чтобы не оставалось ожиданий
+    await state_manager.clear_feedback_state()
 
     photo = FSInputFile(START_INFO.image)
     caption_text = START_INFO.text.format(full_name=message.from_user.full_name or "друг")
@@ -30,7 +31,7 @@ async def start_handler(message: Message):
             menu_message_id=text_msg.message_id,
             last_text=caption_text,
             last_image=START_INFO.image,
-            last_keyboard=get_main_keyboard().model_dump()  # если используется pydantic-модель
+            last_keyboard=get_main_keyboard().model_dump()  
         )
 
         logger.info(
