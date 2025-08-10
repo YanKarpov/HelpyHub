@@ -143,7 +143,6 @@ async def handle_send_identity_choice(callback: CallbackQuery, data: str):
     await send_feedback_prompt(bot, user_id, feedback_type)
     await callback.answer()
 
-
 async def feedback_message_handler(message: Message):
     if message.chat.type != "private":
         logger.debug(f"Ignoring message from chat_id={message.chat.id}, type={message.chat.type}")
@@ -227,14 +226,7 @@ async def feedback_message_handler(message: Message):
 
     await state_mgr.clear_state()
 
-    for msg_id in {prompt_message_id, menu_message_id, image_message_id}:
-        if msg_id:
-            try:
-                await message.bot.delete_message(chat_id=user_id, message_id=msg_id)
-                logger.info(f"Deleted message {msg_id} for user {user_id}")
-            except Exception as e:
-                logger.warning(f"Failed to delete message {msg_id}: {e}")
-
+    # Удаляем только сообщение пользователя с фидбеком
     try:
         await message.delete()
     except Exception as e:
@@ -246,14 +238,45 @@ async def feedback_message_handler(message: Message):
         inline_keyboard=[[back_button()]]  # Используем централизованную функцию
     )
 
-    ack_message = await message.answer_photo(
-        photo=ack_photo,
-        caption=ACKNOWLEDGMENT_CAPTION,
-        reply_markup=back_btn
-    )
+    # Вместо удаления старых сообщений - редактируем их
+    try:
+        if image_message_id:
+            await message.bot.edit_message_media(
+                chat_id=user_id,
+                message_id=image_message_id,
+                media=InputMediaPhoto(media=ack_photo)
+            )
+        
+        if menu_message_id:
+            await message.bot.edit_message_text(
+                chat_id=user_id,
+                message_id=menu_message_id,
+                text=ACKNOWLEDGMENT_CAPTION,
+                reply_markup=back_btn
+            )
+            
+            await state_mgr.save_state(
+                image_message_id=image_message_id,
+                menu_message_id=menu_message_id,
+                last_text=ACKNOWLEDGMENT_CAPTION,
+                last_image=ACKNOWLEDGMENT_IMAGE_PATH,
+                last_keyboard=back_btn
+            )
+    except Exception as e:
+        logger.warning(f"Failed to edit existing messages: {e}")
+        # Если не удалось отредактировать - создаем новые
+        ack_message = await message.answer_photo(
+            photo=ack_photo,
+            caption=ACKNOWLEDGMENT_CAPTION,
+            reply_markup=back_btn
+        )
+        
+        await state_mgr.save_state(
+            image_message_id=ack_message.message_id,
+            menu_message_id=ack_message.message_id,
+            last_text=ACKNOWLEDGMENT_CAPTION,
+            last_image=ACKNOWLEDGMENT_IMAGE_PATH,
+            last_keyboard=back_btn
+        )
 
     await state_mgr.reset_nav()
-    await state_mgr.save_state(
-        image_message_id=ack_message.message_id,
-        menu_message_id=ack_message.message_id
-    )
