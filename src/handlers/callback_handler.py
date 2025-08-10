@@ -9,9 +9,8 @@ from src.handlers.admin_handler import handle_admin_reply
 from src.services.message_service import (
     handle_category_selection,
     handle_category_other,
-    handle_back_to_main
 )
-from src.handlers.back_handler import back_handler  # ← добавляем
+from src.handlers.back_handler import back_handler  
 from src.utils.helpers import handle_bot_user
 from src.utils.categories import CATEGORIES_LIST
 
@@ -19,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 CALLBACK_ROUTES = {
     "back": (back_handler, False),  # ← универсальная кнопка назад
-    # "back_to_main": (handle_back_to_main, False)
     "ignore": (lambda cb: cb.answer("Вы уже здесь", show_alert=True), False),
     "send_named": (handle_send_identity_choice, True),
     "send_anonymous": (handle_send_identity_choice, True),
