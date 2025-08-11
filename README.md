@@ -1,11 +1,12 @@
 <div align="right">
-  
-[![Version](https://img.shields.io/badge/version-v0.1.0--alpha-orange)](https://github.com/YanKarpov/HelpyBot/releases)
+
+[![Version](https://img.shields.io/badge/version-v0.1.0-blue)](https://github.com/YanKarpov/HelpyBot/releases)
 [![Branch](https://img.shields.io/badge/branch-main-blue)](https://github.com/YanKarpov/HelpyBot)
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)](.)
-[![Status](https://img.shields.io/badge/status-alpha-orange)](.)
+[![Status](https://img.shields.io/badge/status-beta-yellow)](.)
 
 </div>
+
 
 # HelpyBot - Telegram бот для обратной связи
 
@@ -47,6 +48,7 @@
 │   │   ├── admin_commands.py
 │   │   ├── admin_handler.py
 │   │   ├── callback_handler.py
+|   |   ├── back_handler.py
 │   │   ├── feedback_handler.py
 │   │   └── start_handler.py
 │   ├── keyboards
