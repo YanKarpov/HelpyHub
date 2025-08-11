@@ -2,6 +2,10 @@ import re
 from typing import List, Optional
 
 class ProfanityFilter:
+    ALLOWED_ENDINGS = [
+        'а', 'ы', 'е', 'ой', 'ую', 'ою', 'и', 'у', 'ам', 'ах', 'ями', 'ях', 'ом', 'енция', 'онька', 'ище', 'астый'
+    ]
+
     def __init__(self, badwords: Optional[List[str]] = None):
         if badwords is None:
             badwords = self._load_default_badwords()
@@ -38,34 +42,45 @@ class ProfanityFilter:
             'ы': '[ыbi]', 'ъ': '[ъb]', 'э': '[эe]', 'ю': '[юiu]',
             'я': '[яya]'
         }
-
-        return ''.join(char_map.get(c, c) + r'[\W_]*' for c in word.lower())
+        # Каждую букву заменить на паттерн + разрешить спецсимволы между буквами
+        return ''.join(char_map.get(c, re.escape(c)) + r'[\W_]*' for c in word.lower())
 
     def _compile_patterns(self, words: List[str]) -> List[re.Pattern]:
         vowels = 'аеиоуыэюяё'
         patterns = []
         for w in words:
-            base = w
-            suffix = ''
+            if not w:
+                continue
 
-            if len(w) > 4 and w[-1] in vowels:
+            # Отделяем корень и возможное окончание
+            base = w
+            endings = []
+
+            # Если слово оканчивается на гласную — отделим корень и сделаем список окончаний
+            if w[-1] in vowels:
                 base = w[:-1]
-                suffix = w[-1]
+                endings = [w[-1]] + self.ALLOWED_ENDINGS
+            else:
+                endings = self.ALLOWED_ENDINGS + ['']  # допускаем и без окончания
 
             base_pattern = self._obfuscate(base)
 
-            if suffix:
-                suffix_pattern = self._obfuscate(suffix) + r'[\W_]*'
-                suffix_pattern = f'(?:{suffix_pattern})*'
-            else:
-                suffix_pattern = ''
+            # Сформируем паттерн для всех окончаний с обфускацией
+            endings_patterns = [self._obfuscate(e) for e in endings]
 
-            full_pattern = base_pattern + suffix_pattern
+            # Допустим ровно одно окончание из списка (или пустое)
+            endings_regex = '(?:' + '|'.join(endings_patterns) + ')'
+
+            full_pattern = rf'(?<!\w){base_pattern}{endings_regex}(?!\w)'
+
             patterns.append(re.compile(full_pattern, re.IGNORECASE))
         return patterns
 
     def contains_profanity(self, text: str) -> bool:
-        return bool(text.strip()) and any(p.search(text) for p in self.patterns)
+        text = text.strip()
+        if not text:
+            return False
+        return any(p.search(text) for p in self.patterns)
 
     def check_and_raise(self, text: str):
         if self.contains_profanity(text):
