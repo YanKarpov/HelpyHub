@@ -17,13 +17,21 @@ async def handle_admin_reply(callback: CallbackQuery, data: str):
         await state_manager.set_admin_reply_target(target_user_id, expire=1800)
         await state_manager.save_state(admin_replying_from_chat=callback.message.chat.id)
 
-        new_text = callback.message.text + "\n\nНапишите ответ для пользователя, и я его отправлю."
-        await callback.message.edit_text(new_text)
+        text = callback.message.text
+        if text:
+            new_text = text + "\n\nНапишите ответ для пользователя, и я его отправлю."
+            await callback.message.edit_text(new_text)
+        else:
+            # Если сообщение без текста (только медиа), просто отправляем уведомление админу
+            await callback.message.answer("Напишите ответ для пользователя, и я его отправлю.")
 
         logger.info(f"Admin {admin_id} started replying to user {target_user_id} from chat {callback.message.chat.id}")
     except ValueError:
         logger.error(f"Invalid user ID in reply_to_user: {data}")
         await callback.answer("Некорректный ID", show_alert=True)
+    except Exception as e:
+        logger.error(f"Error in handle_admin_reply: {e}", exc_info=True)
+        await callback.answer("Произошла ошибка при обработке запроса.", show_alert=True)
 
 
 async def admin_reply_text_handler(message: Message):
@@ -41,26 +49,57 @@ async def admin_reply_text_handler(message: Message):
         user_id = await state_manager.get_admin_reply_target()
         chat_id = await state_manager.get_state_field("admin_replying_from_chat")
 
-        # Проверяем, что сообщение пришло из того же чата, где начат ответ
+        # Проверяем, что сообщение пришло из того же чата
         if user_id is None or chat_id is None or message.chat.id != int(chat_id):
             logger.info(
-                f"Admin {admin_id} sent message from wrong chat ({message.chat.id}), "
-                f"expected {chat_id}. Ignoring."
+                f"Admin {admin_id} sent message from wrong chat ({message.chat.id}), expected {chat_id}. Ignoring."
             )
             return
 
-        await message.bot.send_message(
-            chat_id=user_id,
-            text=f"Ответ от службы поддержки:\n\n{message.text}"
-        )
+        # Формируем подпись для медиа и текста
+        caption_text = f"Ответ от службы поддержки:\n\n{message.caption or message.text or ''}"
+
+        # Отправка по типу контента
+        if message.photo:
+            await message.bot.send_photo(
+                chat_id=user_id,
+                photo=message.photo[-1].file_id,
+                caption=caption_text
+            )
+        elif message.video:
+            await message.bot.send_video(
+                chat_id=user_id,
+                video=message.video.file_id,
+                caption=caption_text
+            )
+        elif message.document:
+            await message.bot.send_document(
+                chat_id=user_id,
+                document=message.document.file_id,
+                caption=caption_text
+            )
+        elif message.animation:
+            await message.bot.send_animation(
+                chat_id=user_id,
+                animation=message.animation.file_id,
+                caption=caption_text
+            )
+        else:
+            # Если текстовое сообщение
+            await message.bot.send_message(
+                chat_id=user_id,
+                text=caption_text
+            )
+
         await message.reply("Сообщение успешно отправлено пользователю.")
 
+        # Обновляем Google Sheets
         admin_username = message.from_user.username or ""
         await asyncio.get_event_loop().run_in_executor(
             None,
             update_feedback_in_sheet,
             user_id,
-            message.text,
+            message.caption or message.text or "",
             str(admin_id),
             admin_username,
             "Вопрос закрыт"
@@ -71,13 +110,14 @@ async def admin_reply_text_handler(message: Message):
 
         # Очищаем состояния
         await state_manager.delete_state_field("admin_replying_from_chat")
-        await state_manager.delete_state_field("admin_replying_to")  # для совместимости, если где-то использовалось
-        await redis_client.delete(state_manager.admin_replying_key)
+        await state_manager.delete_state_field("admin_replying_to")  # для совместимости
+        if hasattr(state_manager, "admin_replying_key") and state_manager.admin_replying_key:
+            await redis_client.delete(state_manager.admin_replying_key)
 
         logger.info(f"Admin {admin_id} finished replying to user {user_id}")
 
     except Exception as e:
-        logger.error(f"Error sending admin reply from admin {admin_id} to user {user_id}: {e}")
+        logger.error(f"Error sending admin reply from admin {admin_id} to user {user_id}: {e}", exc_info=True)
         await message.reply(f"Ошибка отправки: {e}")
 
     finally:
