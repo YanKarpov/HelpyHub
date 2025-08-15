@@ -17,22 +17,54 @@ async def handle_admin_reply(callback: CallbackQuery, data: str):
         await state_manager.set_admin_reply_target(target_user_id, expire=1800)
         await state_manager.save_state(admin_replying_from_chat=callback.message.chat.id)
 
-        text = callback.message.text
-        if text:
-            new_text = text + "\n\nНапишите ответ для пользователя, и я его отправлю."
-            await callback.message.edit_text(new_text)
+        # Определяем, есть ли текст или медиа с подписью
+        current_text = callback.message.text
+        current_caption = callback.message.caption
+        reply_markup = callback.message.reply_markup
+
+        if current_text:
+            # Сообщение с текстом - убираем кнопку
+            new_text = current_text + "\n\nНапишите ответ для пользователя, и я его отправлю."
+            await callback.message.edit_text(
+                new_text,
+                reply_markup=None  # Убираем клавиатуру
+            )
+        elif current_caption:
+            # Сообщение с медиа - обновляем подпись и убираем кнопку
+            new_caption = current_caption + "\n\nНапишите ответ для пользователя, и я его отправлю."
+            
+            # В зависимости от типа медиа используем соответствующий метод
+            if callback.message.photo:
+                await callback.message.edit_caption(
+                    caption=new_caption,
+                    reply_markup=None  # Убираем клавиатуру
+                )
+            elif callback.message.video:
+                await callback.message.edit_caption(
+                    caption=new_caption,
+                    reply_markup=None
+                )
+            elif callback.message.document:
+                await callback.message.edit_caption(
+                    caption=new_caption,
+                    reply_markup=None
+                )
+            # Аналогично для других типов медиа
         else:
-            # Если сообщение без текста (только медиа), просто отправляем уведомление админу
-            await callback.message.answer("Напишите ответ для пользователя, и я его отправлю.")
+            # Сообщение без текста и без подписи
+            await callback.message.edit_text(
+                "Напишите ответ для пользователя, и я его отправлю.",
+                reply_markup=None  # Убираем клавиатуру
+            )
 
         logger.info(f"Admin {admin_id} started replying to user {target_user_id} from chat {callback.message.chat.id}")
+
     except ValueError:
         logger.error(f"Invalid user ID in reply_to_user: {data}")
         await callback.answer("Некорректный ID", show_alert=True)
     except Exception as e:
         logger.error(f"Error in handle_admin_reply: {e}", exc_info=True)
         await callback.answer("Произошла ошибка при обработке запроса.", show_alert=True)
-
 
 async def admin_reply_text_handler(message: Message):
     admin_id = message.from_user.id
@@ -49,17 +81,21 @@ async def admin_reply_text_handler(message: Message):
         user_id = await state_manager.get_admin_reply_target()
         chat_id = await state_manager.get_state_field("admin_replying_from_chat")
 
-        # Проверяем, что сообщение пришло из того же чата
+        # Проверка, что сообщение пришло из того же чата
         if user_id is None or chat_id is None or message.chat.id != int(chat_id):
             logger.info(
                 f"Admin {admin_id} sent message from wrong chat ({message.chat.id}), expected {chat_id}. Ignoring."
             )
             return
 
-        # Формируем подпись для медиа и текста
+        # 🚫 Проверка: без текста или подписи нельзя
+        if not (message.text and message.text.strip()) and not (message.caption and message.caption.strip()):
+            await message.reply("❗ Пожалуйста, добавьте текст к сообщению перед отправкой пользователю.")
+            return
+
         caption_text = f"Ответ от службы поддержки:\n\n{message.caption or message.text or ''}"
 
-        # Отправка по типу контента
+        # --- отправка по типу контента ---
         if message.photo:
             await message.bot.send_photo(
                 chat_id=user_id,
@@ -85,7 +121,6 @@ async def admin_reply_text_handler(message: Message):
                 caption=caption_text
             )
         else:
-            # Если текстовое сообщение
             await message.bot.send_message(
                 chat_id=user_id,
                 text=caption_text
@@ -93,7 +128,7 @@ async def admin_reply_text_handler(message: Message):
 
         await message.reply("Сообщение успешно отправлено пользователю.")
 
-        # Обновляем Google Sheets
+        # --- обновление в Google Sheets ---
         admin_username = message.from_user.username or ""
         await asyncio.get_event_loop().run_in_executor(
             None,
@@ -105,12 +140,10 @@ async def admin_reply_text_handler(message: Message):
             "Вопрос закрыт"
         )
 
-        # Разблокируем пользователя
         await StateManager(user_id).unlock_feedback()
 
-        # Очищаем состояния
         await state_manager.delete_state_field("admin_replying_from_chat")
-        await state_manager.delete_state_field("admin_replying_to")  # для совместимости
+        await state_manager.delete_state_field("admin_replying_to")
         if hasattr(state_manager, "admin_replying_key") and state_manager.admin_replying_key:
             await redis_client.delete(state_manager.admin_replying_key)
 
