@@ -81,17 +81,21 @@ async def admin_reply_text_handler(message: Message):
         user_id = await state_manager.get_admin_reply_target()
         chat_id = await state_manager.get_state_field("admin_replying_from_chat")
 
-        # Проверяем, что сообщение пришло из того же чата
+        # Проверка, что сообщение пришло из того же чата
         if user_id is None or chat_id is None or message.chat.id != int(chat_id):
             logger.info(
                 f"Admin {admin_id} sent message from wrong chat ({message.chat.id}), expected {chat_id}. Ignoring."
             )
             return
 
-        # Формируем подпись для медиа и текста
+        # 🚫 Проверка: без текста или подписи нельзя
+        if not (message.text and message.text.strip()) and not (message.caption and message.caption.strip()):
+            await message.reply("❗ Пожалуйста, добавьте текст к сообщению перед отправкой пользователю.")
+            return
+
         caption_text = f"Ответ от службы поддержки:\n\n{message.caption or message.text or ''}"
 
-        # Отправка по типу контента
+        # --- отправка по типу контента ---
         if message.photo:
             await message.bot.send_photo(
                 chat_id=user_id,
@@ -117,7 +121,6 @@ async def admin_reply_text_handler(message: Message):
                 caption=caption_text
             )
         else:
-            # Если текстовое сообщение
             await message.bot.send_message(
                 chat_id=user_id,
                 text=caption_text
@@ -125,7 +128,7 @@ async def admin_reply_text_handler(message: Message):
 
         await message.reply("Сообщение успешно отправлено пользователю.")
 
-        # Обновляем Google Sheets
+        # --- обновление в Google Sheets ---
         admin_username = message.from_user.username or ""
         await asyncio.get_event_loop().run_in_executor(
             None,
@@ -137,12 +140,10 @@ async def admin_reply_text_handler(message: Message):
             "Вопрос закрыт"
         )
 
-        # Разблокируем пользователя
         await StateManager(user_id).unlock_feedback()
 
-        # Очищаем состояния
         await state_manager.delete_state_field("admin_replying_from_chat")
-        await state_manager.delete_state_field("admin_replying_to")  # для совместимости
+        await state_manager.delete_state_field("admin_replying_to")
         if hasattr(state_manager, "admin_replying_key") and state_manager.admin_replying_key:
             await redis_client.delete(state_manager.admin_replying_key)
 

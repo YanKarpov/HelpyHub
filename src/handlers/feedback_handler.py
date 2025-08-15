@@ -147,6 +147,10 @@ async def feedback_message_handler(message: Message):
     if message.chat.type != "private":
         logger.debug(f"Ignoring message from chat_id={message.chat.id}, type={message.chat.type}")
         return
+    
+    if not (message.text and message.text.strip()) and not (message.caption and message.caption.strip()):
+        await message.answer("❗️ Пожалуйста, добавьте текстовое описание к вашему обращению.")
+        return
 
     user_id = message.from_user.id
     state_mgr = StateManager(user_id)
@@ -191,17 +195,19 @@ async def feedback_message_handler(message: Message):
     sender_display_name = (
         f"@{username}" if (is_named and username) else (full_name if is_named else "Анонимус")
     )
+# Определяем текст сообщения: если есть текст, берём его, иначе подпись медиа
+    message_text = message.text or message.caption or ""
 
     if category == "Срочная помощь":
         text = URGENT_FEEDBACK_NOTIFICATION_TEMPLATE.format(
             sender_display_name=sender_display_name,
-            message_text=message.text or ""
+            message_text=message_text
         )
     else:
         text = FEEDBACK_NOTIFICATION_TEMPLATE.format(
             sender_display_name=sender_display_name,
             category=category,
-            message_text=message.text or ""
+            message_text=message_text
         )
 
     # --- отправка в группу с медиа ---
@@ -230,6 +236,14 @@ async def feedback_message_handler(message: Message):
                 caption=text,
                 reply_markup=get_reply_to_user_keyboard(user_id)
             )
+        elif message.animation:  # если есть гифка
+            await message.bot.send_animation(
+                chat_id=GROUP_CHAT_ID,
+                message_thread_id=SUPPORT_THREAD_ID,
+                animation=message.animation.file_id,
+                caption=text,
+                reply_markup=get_reply_to_user_keyboard(user_id)
+            )
         else:
             await message.bot.send_message(
                 chat_id=GROUP_CHAT_ID,
@@ -240,6 +254,7 @@ async def feedback_message_handler(message: Message):
         logger.info(f"Sent feedback message to support group {GROUP_CHAT_ID} from user {user_id}")
     except Exception as e:
         logger.error(f"Failed to send message to support group: {e}")
+
 
     # --- запись в Google Sheets ---
     try:
