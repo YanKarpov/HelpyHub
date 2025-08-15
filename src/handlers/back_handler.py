@@ -4,7 +4,7 @@ from src.services.state_manager import StateManager
 from src.utils.logger import setup_logger
 from src.handlers.start_handler import start_handler
 from src.handlers.feedback_handler import send_feedback_prompt, handle_feedback_choice
-from src.utils.categories import START_INFO
+from src.templates.categories import START_INFO
 from src.keyboards.main_menu import get_main_keyboard
 
 logger = setup_logger(__name__)

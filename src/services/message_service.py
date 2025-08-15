@@ -4,7 +4,7 @@ from aiogram.exceptions import TelegramBadRequest
 import json
 
 from src.utils.helpers import handle_bot_user, get_keyboard_for_category
-from src.utils.categories import CategoryInfo, CATEGORIES
+from src.templates.categories import CategoryInfo, CATEGORIES
 from src.services.state_manager import StateManager
 from src.utils.logger import setup_logger
 

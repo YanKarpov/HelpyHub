@@ -9,7 +9,7 @@ from src.keyboards.reply import get_reply_to_user_keyboard
 from config.config import Config
 from src.utils.logger import setup_logger
 from src.services.state_manager import StateManager
-from src.utils.categories import (
+from src.templates.categories import (
     FEEDBACK_NOTIFICATION_TEMPLATE,
     URGENT_FEEDBACK_NOTIFICATION_TEMPLATE,
     ACKNOWLEDGMENT_CAPTION,

@@ -6,7 +6,7 @@ def get_keyboard_for_category(info, disabled_category):
     Возвращает соответствующую клавиатуру по категории.
     (Импорт CATEGORIES и клавиатур оставить в том модуле, где будет использоваться)
     """
-    from src.utils.categories import CATEGORIES
+    from src.templates.categories import CATEGORIES
     from src.keyboards.main_menu import get_main_keyboard, get_submenu_keyboard
 
     if info == CATEGORIES["Другое"]:

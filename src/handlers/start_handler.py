@@ -1,7 +1,7 @@
 from aiogram.types import Message, FSInputFile
 from src.keyboards.main_menu import get_main_keyboard
 from src.utils.logger import setup_logger
-from src.utils.categories import START_INFO
+from src.templates.categories import START_INFO
 from src.services.state_manager import StateManager  
 
 logger = setup_logger(__name__)
