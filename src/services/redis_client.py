@@ -1,7 +1,6 @@
 import redis.asyncio as redis
 from config.config import Config
 
-# Добавляем новые переменные окружения через Config
 Config.add_env_var("REDIS_HOST", default="localhost")
 Config.add_env_var("REDIS_PORT", default=6379, cast=int)
 
