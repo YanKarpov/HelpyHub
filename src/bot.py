@@ -6,7 +6,7 @@ from aiogram.filters import Filter
 from src.handlers.back_handler import back_handler
 
 
-from src.utils.config import BOT_TOKEN
+from config.config import Config
 from src.handlers.start_handler import start_handler
 from src.handlers.callback_handler import callback_handler
 from src.handlers.feedback_handler import feedback_message_handler
@@ -18,7 +18,7 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 storage = RedisStorage(redis=redis_client)
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=Config.BOT_TOKEN)
 dp = Dispatcher(bot=bot, storage=storage)
 
 class IsAdminReplying(Filter):

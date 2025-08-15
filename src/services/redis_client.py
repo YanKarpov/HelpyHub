@@ -1,12 +1,13 @@
-import os
 import redis.asyncio as redis
+from config.config import Config
 
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+# Добавляем новые переменные окружения через Config
+Config.add_env_var("REDIS_HOST", default="localhost")
+Config.add_env_var("REDIS_PORT", default=6379, cast=int)
 
 redis_client = redis.Redis(
-    host=REDIS_HOST,    
-    port=REDIS_PORT,
+    host=Config.REDIS_HOST,
+    port=Config.REDIS_PORT,
     db=0,
     decode_responses=True
 )

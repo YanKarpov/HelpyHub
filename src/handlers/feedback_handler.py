@@ -1,13 +1,12 @@
 import asyncio
 from aiogram.types import (
     Message, FSInputFile, InputMediaPhoto,
-    InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+    InlineKeyboardMarkup, CallbackQuery
 )
-from src.keyboards.main_menu import back_button  # <-- импортируем функцию кнопки назад
-
+from src.keyboards.main_menu import back_button  
 from src.keyboards.identity import get_identity_choice_keyboard
 from src.keyboards.reply import get_reply_to_user_keyboard
-from src.utils.config import GROUP_CHAT_ID, SUPPORT_THREAD_ID
+from config.config import Config
 from src.utils.logger import setup_logger
 from src.services.state_manager import StateManager
 from src.utils.categories import (
@@ -20,7 +19,7 @@ from src.utils.categories import (
 )
 from src.utils.media_utils import send_or_edit_media
 from src.utils.helpers import handle_bot_user
-from src.utils.filter_profanity import ProfanityFilter
+from src.utils.profanity_filter import ProfanityFilter
 from src.services.google_sheets import append_feedback_to_sheet
 
 logger = setup_logger(__name__)
@@ -48,7 +47,7 @@ async def send_feedback_prompt(bot, user_id, feedback_type):
 
     logger.info(f"Current saved state for user {user_id}: image_msg_id={image_msg_id}, text_msg_id={text_msg_id}")
 
-    back_kb = InlineKeyboardMarkup(inline_keyboard=[[back_button()]])  # Кнопка назад
+    back_kb = InlineKeyboardMarkup(inline_keyboard=[[back_button()]])
 
     if image_msg_id and text_msg_id:
         logger.info(f"Editing existing messages for user {user_id}")
@@ -66,14 +65,14 @@ async def send_feedback_prompt(bot, user_id, feedback_type):
                 chat_id=user_id,
                 message_id=text_msg_id,
                 text=message_text,
-                reply_markup=back_kb  # Добавляем кнопку назад
+                reply_markup=back_kb
             )
             await state_mgr.save_state(prompt_message_id=text_msg_id)
         except Exception as e:
             logger.warning(f"Failed to edit feedback text for user {user_id}: {e}")
     else:
         image_msg = await bot.send_photo(chat_id=user_id, photo=FSInputFile(info.image))
-        text_msg = await bot.send_message(chat_id=user_id, text=message_text, reply_markup=back_kb)  # с кнопкой назад
+        text_msg = await bot.send_message(chat_id=user_id, text=message_text, reply_markup=back_kb)
 
         await state_mgr.save_state(
             image_message_id=image_msg.message_id,
@@ -143,6 +142,7 @@ async def handle_send_identity_choice(callback: CallbackQuery, data: str):
     await send_feedback_prompt(bot, user_id, feedback_type)
     await callback.answer()
 
+
 async def feedback_message_handler(message: Message):
     if message.chat.type != "private":
         logger.debug(f"Ignoring message from chat_id={message.chat.id}, type={message.chat.type}")
@@ -195,7 +195,7 @@ async def feedback_message_handler(message: Message):
     sender_display_name = (
         f"@{username}" if (is_named and username) else (full_name if is_named else "Анонимус")
     )
-# Определяем текст сообщения: если есть текст, берём его, иначе подпись медиа
+
     message_text = message.text or message.caption or ""
 
     if category == "Срочная помощь":
@@ -214,44 +214,44 @@ async def feedback_message_handler(message: Message):
     try:
         if message.photo:
             await message.bot.send_photo(
-                chat_id=GROUP_CHAT_ID,
-                message_thread_id=SUPPORT_THREAD_ID,
+                chat_id=Config.GROUP_CHAT_ID,
+                message_thread_id=Config.SUPPORT_THREAD_ID,
                 photo=message.photo[-1].file_id,
                 caption=text,
                 reply_markup=get_reply_to_user_keyboard(user_id)
             )
         elif message.document:
             await message.bot.send_document(
-                chat_id=GROUP_CHAT_ID,
-                message_thread_id=SUPPORT_THREAD_ID,
+                chat_id=Config.GROUP_CHAT_ID,
+                message_thread_id=Config.SUPPORT_THREAD_ID,
                 document=message.document.file_id,
                 caption=text,
                 reply_markup=get_reply_to_user_keyboard(user_id)
             )
         elif message.video:
             await message.bot.send_video(
-                chat_id=GROUP_CHAT_ID,
-                message_thread_id=SUPPORT_THREAD_ID,
+                chat_id=Config.GROUP_CHAT_ID,
+                message_thread_id=Config.SUPPORT_THREAD_ID,
                 video=message.video.file_id,
                 caption=text,
                 reply_markup=get_reply_to_user_keyboard(user_id)
             )
-        elif message.animation:  # если есть гифка
+        elif message.animation:
             await message.bot.send_animation(
-                chat_id=GROUP_CHAT_ID,
-                message_thread_id=SUPPORT_THREAD_ID,
+                chat_id=Config.GROUP_CHAT_ID,
+                message_thread_id=Config.SUPPORT_THREAD_ID,
                 animation=message.animation.file_id,
                 caption=text,
                 reply_markup=get_reply_to_user_keyboard(user_id)
             )
         else:
             await message.bot.send_message(
-                chat_id=GROUP_CHAT_ID,
-                message_thread_id=SUPPORT_THREAD_ID,
+                chat_id=Config.GROUP_CHAT_ID,
+                message_thread_id=Config.SUPPORT_THREAD_ID,
                 text=text,
                 reply_markup=get_reply_to_user_keyboard(user_id)
             )
-        logger.info(f"Sent feedback message to support group {GROUP_CHAT_ID} from user {user_id}")
+        logger.info(f"Sent feedback message to support group {Config.GROUP_CHAT_ID} from user {user_id}")
     except Exception as e:
         logger.error(f"Failed to send message to support group: {e}")
 
