@@ -1,9 +1,9 @@
 import pytest
-from src.utils.filter_profanity import ProfanityFilter
+from src.utils.profanity_filter import ProfanityFilter
 
 @pytest.fixture
 def filter():
-    return ProfanityFilter.from_file("badwords.txt")
+    return ProfanityFilter.from_file("assets/data/badwords.txt")
 
 # === Мат должен детектиться ===
 @pytest.mark.parametrize("text", [

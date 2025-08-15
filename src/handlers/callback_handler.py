@@ -5,7 +5,7 @@ from src.handlers.feedback_handler import (
     handle_feedback_choice,
     handle_send_identity_choice
 )
-from src.handlers.admin_handler import handle_admin_reply
+from src.handlers.admin.reply_handler import handle_admin_reply
 from src.services.message_service import (
     handle_category_selection,
     handle_category_other,

@@ -12,7 +12,7 @@ class ProfanityFilter:
         self.patterns = self._compile_patterns(badwords)
 
     @staticmethod
-    def _load_default_badwords(filepath: str = "badwords.txt") -> List[str]:
+    def _load_default_badwords(filepath: str = "assets/data/badwords.txt") -> List[str]:
         try:
             with open(filepath, encoding="utf-8") as f:
                 return [line.strip() for line in f if line.strip()]

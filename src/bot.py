@@ -10,9 +10,9 @@ from config.config import Config
 from src.handlers.start_handler import start_handler
 from src.handlers.callback_handler import callback_handler
 from src.handlers.feedback_handler import feedback_message_handler
-from src.handlers.admin_handler import admin_reply_text_handler  
+from src.handlers.admin.reply_handler import admin_reply_text_handler  
 from src.services.redis_client import redis_client
-from src.handlers.admin_commands import block_user_handler, unblock_user_handler
+from src.handlers.admin.block_commands import block_user_handler, unblock_user_handler
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
