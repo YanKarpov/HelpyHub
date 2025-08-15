@@ -1,7 +1,6 @@
 <div align="right">
 
 [![Version](https://img.shields.io/badge/version-v0.1.0-blue)](https://github.com/YanKarpov/HelpyBot/releases)
-[![Branch](https://img.shields.io/badge/branch-main-blue)](https://github.com/YanKarpov/HelpyBot)
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)](.)
 [![Status](https://img.shields.io/badge/status-beta-yellow)](.)
 
