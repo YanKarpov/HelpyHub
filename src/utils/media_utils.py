@@ -10,7 +10,7 @@ from aiogram.types import (
 )
 
 from src.utils.logger import setup_logger
-from src.services.state_manager import StateManager  
+from src.services.internal.state_manager import StateManager  
 
 logger = setup_logger(__name__)
 

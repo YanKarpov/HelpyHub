@@ -5,7 +5,7 @@ import json
 
 from src.utils.helpers import handle_bot_user, get_keyboard_for_category
 from src.templates.categories import CategoryInfo, CATEGORIES
-from src.services.state_manager import StateManager
+from src.services.internal.state_manager import StateManager
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)

@@ -1,6 +1,6 @@
 from aiogram import types
 from config.config import Config
-from src.services.redis_client import redis_client
+from src.services.external.redis_client import redis_client
 from src.utils.logger import setup_logger
 from src.templates.admin_messages import (
     BLOCKED_GROUP_ONLY,

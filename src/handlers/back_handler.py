@@ -1,6 +1,6 @@
 from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto
 import json
-from src.services.state_manager import StateManager
+from src.services.internal.state_manager import StateManager
 from src.utils.logger import setup_logger
 from src.handlers.start_handler import start_handler
 from src.handlers.feedback_handler import send_feedback_prompt, handle_feedback_choice

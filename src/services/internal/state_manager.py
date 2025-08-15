@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict, Optional, Union
 import asyncio
 import json
-from src.services.redis_client import redis_client
+from src.services.external.redis_client import redis_client
 from src.utils.logger import setup_logger  
 
 # Redis ключи

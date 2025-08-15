@@ -8,7 +8,7 @@ from src.keyboards.identity import get_identity_choice_keyboard
 from src.keyboards.reply import get_reply_to_user_keyboard
 from config.config import Config
 from src.utils.logger import setup_logger
-from src.services.state_manager import StateManager
+from src.services.internal.state_manager import StateManager
 from src.templates.categories import (
     FEEDBACK_NOTIFICATION_TEMPLATE,
     URGENT_FEEDBACK_NOTIFICATION_TEMPLATE,
@@ -20,7 +20,7 @@ from src.templates.categories import (
 from src.utils.media_utils import send_or_edit_media
 from src.utils.helpers import handle_bot_user
 from src.utils.profanity_filter import ProfanityFilter
-from src.services.google_sheets import append_feedback_to_sheet
+from src.services.external.google_sheets import append_feedback_to_sheet
 
 logger = setup_logger(__name__)
 

@@ -1,7 +1,7 @@
 from aiogram.types import CallbackQuery, Message
-from src.services.state_manager import StateManager
-from src.services.google_sheets import update_feedback_in_sheet
-from src.services.redis_client import redis_client
+from src.services.internal.state_manager import StateManager
+from src.services.external.google_sheets import update_feedback_in_sheet
+from src.services.external.redis_client import redis_client
 from src.utils.logger import setup_logger
 from src.templates.admin_messages import (
     ADMIN_REPLY_PROMPT,
