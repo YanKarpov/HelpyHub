@@ -4,10 +4,9 @@ services:
   redis:
     image: redis:7
     container_name: redis-bot
-    ports:
-      - "6379:6379"
     environment:
       - TZ=Europe/Moscow
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL,DEBUG 
     restart: unless-stopped
     volumes:
       - redis_data:/data

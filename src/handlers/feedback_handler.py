@@ -1,10 +1,9 @@
 import asyncio
 from aiogram.types import (
     Message, FSInputFile, InputMediaPhoto,
-    InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+    InlineKeyboardMarkup, CallbackQuery
 )
-from src.keyboards.main_menu import back_button  # <-- импортируем функцию кнопки назад
-
+from src.keyboards.main_menu import back_button 
 from src.keyboards.identity import get_identity_choice_keyboard
 from src.keyboards.reply import get_reply_to_user_keyboard
 from src.utils.config import GROUP_CHAT_ID, SUPPORT_THREAD_ID
@@ -22,6 +21,7 @@ from src.utils.media_utils import send_or_edit_media
 from src.utils.helpers import handle_bot_user
 from src.utils.filter_profanity import ProfanityFilter
 from src.services.google_sheets import append_feedback_to_sheet
+from src.utils.feedback_validator import FeedbackValidator  # <-- импорт валидатора
 
 logger = setup_logger(__name__)
 
@@ -143,6 +143,7 @@ async def handle_send_identity_choice(callback: CallbackQuery, data: str):
     await send_feedback_prompt(bot, user_id, feedback_type)
     await callback.answer()
 
+
 async def feedback_message_handler(message: Message):
     if message.chat.type != "private":
         logger.debug(f"Ignoring message from chat_id={message.chat.id}, type={message.chat.type}")
@@ -150,6 +151,12 @@ async def feedback_message_handler(message: Message):
     
     if not (message.text and message.text.strip()) and not (message.caption and message.caption.strip()):
         await message.answer("❗️ Пожалуйста, добавьте текстовое описание к вашему обращению.")
+        return
+
+    # --- проверка длины текста через валидатор ---
+    length_error = FeedbackValidator.check_length(message)
+    if length_error:
+        await message.answer(length_error)
         return
 
     user_id = message.from_user.id
@@ -195,7 +202,8 @@ async def feedback_message_handler(message: Message):
     sender_display_name = (
         f"@{username}" if (is_named and username) else (full_name if is_named else "Анонимус")
     )
-# Определяем текст сообщения: если есть текст, берём его, иначе подпись медиа
+
+    # Определяем текст сообщения: если есть текст, берём его, иначе подпись медиа
     message_text = message.text or message.caption or ""
 
     if category == "Срочная помощь":
@@ -254,7 +262,6 @@ async def feedback_message_handler(message: Message):
         logger.info(f"Sent feedback message to support group {GROUP_CHAT_ID} from user {user_id}")
     except Exception as e:
         logger.error(f"Failed to send message to support group: {e}")
-
 
     # --- запись в Google Sheets ---
     try:
