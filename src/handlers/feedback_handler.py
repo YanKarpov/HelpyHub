@@ -15,13 +15,14 @@ from src.utils.categories import (
     ACKNOWLEDGMENT_CAPTION,
     ACKNOWLEDGMENT_IMAGE_PATH,
     CATEGORIES,
-    SUBCATEGORIES
+    SUBCATEGORIES,
+    PRINT_REQUEST_NOTIFICATION_TEMPLATE
 )
 from src.utils.media_utils import send_or_edit_media
 from src.utils.helpers import handle_bot_user
 from src.utils.filter_profanity import ProfanityFilter
 from src.services.google_sheets import append_feedback_to_sheet
-from src.utils.feedback_validator import FeedbackValidator  # <-- импорт валидатора
+from src.utils.feedback_validator import FeedbackValidator 
 
 logger = setup_logger(__name__)
 
@@ -144,6 +145,34 @@ async def handle_send_identity_choice(callback: CallbackQuery, data: str):
     await callback.answer()
 
 
+async def handle_print_request(callback: CallbackQuery, data: str):
+    if await handle_bot_user(callback):
+        return
+
+    user_id = callback.from_user.id
+    bot = callback.message.bot
+    state_mgr = StateManager(user_id)
+
+    if await state_mgr.is_blocked():
+        await callback.answer("❌ Вы заблокированы и не можете отправлять запросы.", show_alert=True)
+        return
+
+    if not await state_mgr.can_create_feedback():
+        await callback.answer(
+            "❗️ У вас уже есть открытое обращение. Дождитесь ответа перед созданием нового. ❗️",
+            show_alert=True
+        )
+        return
+
+    feedback_type = data  
+    await state_mgr.set_feedback_type(feedback_type, expire=300)
+    await state_mgr.save_state(type=feedback_type, is_named=True)
+    await state_mgr.push_nav("feedback_prompt", {"feedback_type": feedback_type})
+
+    await send_feedback_prompt(bot, user_id, feedback_type)
+    await callback.answer()
+
+
 async def feedback_message_handler(message: Message):
     if message.chat.type != "private":
         logger.debug(f"Ignoring message from chat_id={message.chat.id}, type={message.chat.type}")
@@ -211,12 +240,18 @@ async def feedback_message_handler(message: Message):
             sender_display_name=sender_display_name,
             message_text=message_text
         )
+    elif category == "Запрос на печать":
+        text = PRINT_REQUEST_NOTIFICATION_TEMPLATE.format(
+            sender_display_name=sender_display_name,
+            message_text=message_text
+        )
     else:
         text = FEEDBACK_NOTIFICATION_TEMPLATE.format(
             sender_display_name=sender_display_name,
             category=category,
             message_text=message_text
         )
+
 
     # --- отправка в группу с медиа ---
     try:

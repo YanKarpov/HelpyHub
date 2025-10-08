@@ -3,7 +3,8 @@ import logging
 
 from src.handlers.feedback_handler import (
     handle_feedback_choice,
-    handle_send_identity_choice
+    handle_send_identity_choice,
+    handle_print_request
 )
 from src.handlers.admin_handler import handle_admin_reply
 from src.services.message_service import (
@@ -17,7 +18,7 @@ from src.utils.categories import CATEGORIES_LIST
 logger = logging.getLogger(__name__)
 
 CALLBACK_ROUTES = {
-    "back": (back_handler, False),  # ← универсальная кнопка назад
+    "back": (back_handler, False), 
     "ignore": (lambda cb: cb.answer("Вы уже здесь", show_alert=True), False),
     "send_named": (handle_send_identity_choice, True),
     "send_anonymous": (handle_send_identity_choice, True),
@@ -25,6 +26,7 @@ CALLBACK_ROUTES = {
     "Проблемы с техникой": (handle_feedback_choice, True),
     "Срочная помощь": (handle_feedback_choice, True),
     "Обратная связь": (handle_feedback_choice, True),
+    "Запрос на печать": (handle_print_request, True)
 }
 
 async def callback_handler(callback: CallbackQuery):

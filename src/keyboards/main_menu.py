@@ -26,6 +26,8 @@ def get_submenu_keyboard(category: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="Проблемы с техникой", callback_data="Проблемы с техникой"),
             InlineKeyboardButton(text="Обратная связь", callback_data="Обратная связь"),
             InlineKeyboardButton(text="Срочная помощь", callback_data="Срочная помощь"),
+            InlineKeyboardButton(text="Запрос на печать", callback_data="Запрос на печать")
+
         ])
 
     buttons.append(back_button())
