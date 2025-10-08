@@ -27,9 +27,10 @@ def get_submenu_keyboard(category: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="Обратная связь", callback_data="Обратная связь"),
             InlineKeyboardButton(text="Срочная помощь", callback_data="Срочная помощь"),
             InlineKeyboardButton(text="Запрос на печать", callback_data="Запрос на печать")
-
         ])
 
     buttons.append(back_button())
-    # Каждая кнопка в отдельном ряду
-    return InlineKeyboardMarkup(inline_keyboard=[[btn] for btn in buttons])
+
+    keyboard_rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
