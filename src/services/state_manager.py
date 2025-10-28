@@ -11,6 +11,8 @@ FEEDBACK_LOCK_KEY = "feedback_lock:{user_id}"
 BLOCKED_USER_KEY = "blocked:{user_id}"
 ADMIN_REPLYING_KEY = "admin_replying:{admin_id}"
 NAV_STACK_KEY = "nav_stack:{user_id}"  
+MEDIA_GROUP_KEY = "media_group:{media_group_id}"
+MEDIA_GROUP_PROCESSING_KEY = "media_group_processing:{media_group_id}"
 
 class StateManager:
     
@@ -212,6 +214,100 @@ class StateManager:
         stack = await self._read_nav_stack()
         return stack[-1]
 
+    # Медиагруппы
+
+    async def set_media_group_processing(self, media_group_id: str, processing: bool):
+        """Помечает медиагруппу как обрабатываемую"""
+        key = MEDIA_GROUP_PROCESSING_KEY.format(media_group_id=media_group_id)
+        if processing:
+            await redis_client.setex(key, 30, "1")  # 30 секунд
+            self.logger.info(f"[User {self.user_id}] set_media_group_processing: {media_group_id} = True")
+        else:
+            await redis_client.delete(key)
+            self.logger.info(f"[User {self.user_id}] set_media_group_processing: {media_group_id} = False")
+
+    async def get_media_group_processing(self, media_group_id: str) -> bool:
+        """Проверяет, обрабатывается ли медиагруппа"""
+        key = MEDIA_GROUP_PROCESSING_KEY.format(media_group_id=media_group_id)
+        data = await redis_client.get(key)
+        is_processing = data is not None
+        self.logger.info(f"[User {self.user_id}] get_media_group_processing: {media_group_id} = {is_processing}")
+        return is_processing
+
+    async def clear_media_group_processing(self, media_group_id: str):
+        """Снимает пометку обработки медиагруппы"""
+        key = MEDIA_GROUP_PROCESSING_KEY.format(media_group_id=media_group_id)
+        await redis_client.delete(key)
+        self.logger.info(f"[User {self.user_id}] clear_media_group_processing: {media_group_id}")
+
+    async def is_user_locked(self) -> bool:
+        """Проверяет, заблокирован ли пользователь для создания новых обращений"""
+        exists = await redis_client.exists(self.lock_key)
+        is_locked = exists == 1
+        self.logger.info(f"[User {self.user_id}] is_user_locked: {is_locked}")
+        return is_locked
+
+
+    async def save_media_group(self, media_group_id: str, messages_data: list):
+        """Сохраняет сообщения медиагруппы (только необходимые данные)"""
+        key = MEDIA_GROUP_KEY.format(media_group_id=media_group_id)
+        
+        # messages_data уже должен быть списком словарей с данными сообщений
+        # Проверяем, что это действительно словари, а не объекты Message
+        processed_data = []
+        for msg_data in messages_data:
+            if isinstance(msg_data, dict):
+                # Уже словарь - используем как есть
+                processed_data.append(msg_data)
+            else:
+                # Это объект Message - преобразуем в словарь
+                message_dict = {
+                    'message_id': msg_data.message_id,
+                    'text': msg_data.text or "",
+                    'caption': msg_data.caption or "",
+                    'media_type': None,
+                    'file_id': None
+                }
+                
+                # Добавляем информацию о медиа
+                if msg_data.photo:
+                    message_dict['media_type'] = 'photo'
+                    message_dict['file_id'] = msg_data.photo[-1].file_id
+                elif msg_data.document:
+                    message_dict['media_type'] = 'document'
+                    message_dict['file_id'] = msg_data.document.file_id
+                elif msg_data.video:
+                    message_dict['media_type'] = 'video'
+                    message_dict['file_id'] = msg_data.video.file_id
+                elif msg_data.animation:
+                    message_dict['media_type'] = 'animation'
+                    message_dict['file_id'] = msg_data.animation.file_id
+                    
+                processed_data.append(message_dict)
+        
+        await redis_client.setex(key, 300, json.dumps(processed_data))
+        self.logger.info(f"[User {self.user_id}] save_media_group: {media_group_id} with {len(processed_data)} messages")
+
+    async def get_media_group(self, media_group_id: str) -> list:
+        """Получает сохраненные сообщения медиагруппы"""
+        key = MEDIA_GROUP_KEY.format(media_group_id=media_group_id)
+        data = await redis_client.get(key)
+        if data:
+            try:
+                result = json.loads(data)
+                self.logger.info(f"[User {self.user_id}] get_media_group: {media_group_id} found {len(result)} messages")
+                return result
+            except json.JSONDecodeError:
+                self.logger.error(f"[User {self.user_id}] get_media_group: JSON decode error for {media_group_id}")
+                return None
+        self.logger.info(f"[User {self.user_id}] get_media_group: {media_group_id} not found")
+        return None
+    
+    async def clear_media_group(self, media_group_id: str):
+        """Удаляет данные медиагруппы"""
+        key = MEDIA_GROUP_KEY.format(media_group_id=media_group_id)
+        await redis_client.delete(key)
+        self.logger.info(f"[User {self.user_id}] clear_media_group: {media_group_id}")
 
     # Aliases
 
